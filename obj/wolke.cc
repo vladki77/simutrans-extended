@@ -17,6 +17,8 @@
 
 #include "../tpl/vector_tpl.h"
 
+#define SMOKE_SPEED 1
+#define SMOKE_RANDOM 0
 
 vector_tpl<const skin_desc_t *>wolke_t::all_clouds(0);
 
@@ -34,7 +36,7 @@ bool wolke_t::register_desc(const skin_desc_t* desc)
 
 
 
-wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, const skin_desc_t* desc ) :
+wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, sint16 h_off, const skin_desc_t* desc ) :
 #ifdef INLINE_OBJ_TYPE
     obj_no_info_t(obj_t::sync_wolke, pos)
 #else
@@ -42,7 +44,8 @@ wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, const skin_desc_t* desc 
 #endif
 {
 	cloud_nr = all_clouds.index_of(desc);
-	base_y_off = clamp( (sint16)y_off - 8, -128, 127 );
+	smoke_height = h_off;
+	base_y_off = clamp( (sint16)y_off - smoke_height, -128, 127 );
 	set_xoff( x_off );
 	set_yoff( base_y_off );
 	purchase_time = 0;
@@ -114,8 +117,10 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	const image_id new_img = get_image();
 
 	// move cloud up
-	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS) >> 12);
+	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12);
 	if (new_yoff != get_yoff() || new_img != old_img) {
+		// move cloud randomly sideways
+		const sint8 new_xoff = get_xoff() + sim_async_rand(2 * SMOKE_RANDOM + 1) - SMOKE_RANDOM;
 		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
 		if (!get_flag(obj_t::dirty)) {
 			set_flag(obj_t::dirty);
@@ -125,6 +130,7 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 			}
 		}
 		set_yoff(new_yoff);
+		set_xoff(new_xoff);
 	}
 	return SYNC_OK;
 }
@@ -134,11 +140,11 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 void wolke_t::rotate90()
 {
 	// restore pure yoff
-	set_yoff( base_y_off + 8 );
+	set_yoff( base_y_off + smoke_height );
 	obj_t::rotate90();
-	// .. and recalc smoke offsets
-	base_y_off = clamp( (sint16)get_yoff()-8, -128, 127 );
-	set_yoff( base_y_off - ((purchase_time*OBJECT_OFFSET_STEPS) >> 12) );
+	// .. and recalc height offsets
+	base_y_off = clamp( (sint16)get_yoff() - smoke_height, -128, 127 );
+	set_yoff( base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12) );
 }
 
 /***************************** just for compatibility, the old raucher and smoke clouds *********************************/
