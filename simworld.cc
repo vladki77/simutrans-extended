@@ -1117,8 +1117,8 @@ void karte_t::distribute_cities( settings_t const * const sets, sint16 old_x, si
 			desc = way_builder_t::weg_search(road_wt, 80, get_timeline_year_month(), type_flat);
 		}
 
-		way_builder_t bauigel (get_public_player());
-		bauigel.init_builder(way_builder_t::strasse | way_builder_t::terraform_flag, desc, tunnel_builder_t::get_tunnel_desc(road_wt, desc->get_topspeed(), get_timeline_year_month()), bridge_builder_t::find_bridge(road_wt, desc->get_topspeed(), get_timeline_year_month()) );
+		way_builder_t bauigel (NULL);
+		bauigel.init_builder(way_builder_t::strasse | way_builder_t::terraform_flag, desc, tunnel_builder_t::get_tunnel_desc(road_wt, desc->get_topspeed(), get_timeline_year_month()), bridge_builder_t::find_bridge(road_wt, desc->get_topspeed(), get_timeline_year_month()));
 		bauigel.set_keep_existing_ways(true);
 		bauigel.set_maximum(env_t::intercity_road_length);
 
@@ -1652,11 +1652,12 @@ void *step_passengers_and_mail_threaded(void* args)
 {
 	const uint32* thread_number_ptr = (const uint32*)args;
 	karte_t::passenger_generation_thread_number = *thread_number_ptr;
+	const uint32 seed_base = karte_t::world->get_settings().get_random_counter();
 	
 	// This may easily overflow, but this is irrelevant for the purposes of a random seed
 	// (so long as both server and client are using the same size of integer)
 
-	const uint32 seed = karte_t::world->get_settings().get_random_counter() * *thread_number_ptr;
+	const uint32 seed = seed_base * karte_t::passenger_generation_thread_number;
 
 	delete thread_number_ptr;
 
@@ -5692,7 +5693,7 @@ void karte_t::step_time_interval_signals()
 sint32 karte_t::calc_adjusted_step_interval(const uint32 weight, uint32 trips_per_month_hundredths) const
 {
 	const uint32 median_packet_size = (uint32)(get_settings().get_passenger_routing_packet_size() + 1) / 2;	
-	const uint64 trips_per_month = (std::max)((((sint64)weight * (sint64)calc_adjusted_monthly_figure(trips_per_month_hundredths)) / 100ll) / (sint64)median_packet_size, 1ll);
+	const uint64 trips_per_month = std::max((((sint64)weight * (sint64)calc_adjusted_monthly_figure(trips_per_month_hundredths)) / 100ll) / (sint64)median_packet_size, 1ll);
 		
 	return (sint32)((uint64)ticks_per_world_month > trips_per_month ? (uint64) ticks_per_world_month / trips_per_month : 1);
 }
