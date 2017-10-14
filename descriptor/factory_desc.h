@@ -99,6 +99,7 @@ class smoke_desc_t : public obj_desc_t {
 private:
 	koord pos_off;
 	koord xy_off;
+	sint16 smoke_height;
 
 public:
 	const char *get_name() const { return get_images()->get_name(); }
@@ -115,15 +116,18 @@ public:
 		return pos_off;
 	}
 
-	// offset in pixel (depends on OBJECT_OFFSET_STEPS==16)
+	// offset of chimney base in pixel (depends on OBJECT_OFFSET_STEPS==16)
 	koord get_xy_off(uint8 rotation) const {
 		switch( rotation%4 ) {
-			case 1: return koord( 0, xy_off.y+xy_off.x/2 );
-			case 2: return koord( -xy_off.x, xy_off.y );
-			case 3: return koord( 0, xy_off.y-xy_off.x/2 );
+			case 1: return koord( -xy_off.y*2, xy_off.x/2 );
+			case 2: return koord( -xy_off.x, -xy_off.y );
+			case 3: return koord( xy_off.y*2, -xy_off.x/2 );
 		}
 		return xy_off;
 	}
+
+	// height of chimney in pixel (depends on OBJECT_OFFSET_STEPS==16)
+	sint16 get_smoke_height() const { return smoke_height; }
 };
 
 

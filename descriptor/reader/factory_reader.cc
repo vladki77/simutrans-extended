@@ -172,7 +172,9 @@ obj_desc_t *factory_smoke_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 	y = decode_sint16(p);
 
 	desc->xy_off = koord( x, y );
-	/*smoke speed*/ decode_sint16(p);
+
+	sint16 h = decode_sint16(p);
+	desc->smoke_height = h;
 
 	DBG_DEBUG("factory_product_reader_t::read_node()","zeitmaske=%d (size %i)",node.size);
 
