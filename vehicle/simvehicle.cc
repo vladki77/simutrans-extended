@@ -81,8 +81,6 @@
 #include "simvehicle.h"
 #include "simroadtraffic.h"
 
-#define SMOKE_HEIGHT 8
-
 /* get dx and dy from dir (just to remind you)
  * any vehicle (including city cars and pedestrians)
  * will go this distance per sync step.

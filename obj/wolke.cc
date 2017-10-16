@@ -17,9 +17,6 @@
 
 #include "../tpl/vector_tpl.h"
 
-#define SMOKE_SPEED 1
-#define SMOKE_RANDOM 0
-
 vector_tpl<const skin_desc_t *>wolke_t::all_clouds(0);
 
 bool wolke_t::register_desc(const skin_desc_t* desc)
@@ -120,7 +117,8 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12);
 	if (new_yoff != get_yoff() || new_img != old_img) {
 		// move cloud randomly sideways
-		const sint8 new_xoff = get_xoff() + sim_async_rand(2 * SMOKE_RANDOM + 1) - SMOKE_RANDOM;
+		//const sint8 new_xoff = get_xoff() + sim_async_rand(2 * SMOKE_RANDOM + 1) - SMOKE_RANDOM;
+		const sint8 new_xoff = get_xoff() + sim_async_rand(SMOKE_RANDOM + 1);
 		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
 		if (!get_flag(obj_t::dirty)) {
 			set_flag(obj_t::dirty);

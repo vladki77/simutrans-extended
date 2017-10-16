@@ -40,6 +40,10 @@ class schiene_t;
 #define HOLDING_PATTERN_LENGTH 16
 // offset of end tile of the holding pattern before touchdown tile.
 #define HOLDING_PATTERN_OFFSET 3
+
+// Height offset for vehicle smoke (may be configurable in the future)
+#define SMOKE_HEIGHT 8
+
 /*----------------------- Movables ------------------------------------*/
 
 /**

@@ -6,6 +6,11 @@
 #include "../tpl/vector_tpl.h"
 #include "../display/simimg.h"
 
+// speed of smoke movement
+#define SMOKE_SPEED 1
+// speed of wind affecting smoke
+#define SMOKE_RANDOM 1
+
 class karte_t;
 
 /**
