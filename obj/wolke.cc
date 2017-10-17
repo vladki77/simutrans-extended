@@ -116,9 +116,8 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	// move cloud up
 	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12);
 	if (new_yoff != get_yoff() || new_img != old_img) {
-		// move cloud randomly sideways
-		//const sint8 new_xoff = get_xoff() + sim_async_rand(2 * SMOKE_RANDOM + 1) - SMOKE_RANDOM;
-		const sint8 new_xoff = get_xoff() + sim_async_rand(SMOKE_RANDOM + 1);
+		// move cloud randomly sideways - be consistent with planes - wind blows from NE (right)
+		const sint8 new_xoff = get_xoff() - sim_async_rand(SMOKE_RANDOM + 1);
 		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
 		if (!get_flag(obj_t::dirty)) {
 			set_flag(obj_t::dirty);
