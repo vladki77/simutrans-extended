@@ -9,7 +9,11 @@
 // speed of smoke movement
 #define SMOKE_SPEED 1
 // speed of wind affecting smoke
-#define SMOKE_RANDOM 1
+#define WIND_SPEED 0
+//#define WIND_SPEED 1
+//#define WIND_SPEED sim_async_rand(2)
+// smoke lifetime
+#define SMOKE_LIFE 2500
 
 class karte_t;
 

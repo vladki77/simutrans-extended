@@ -99,6 +99,7 @@ class smoke_desc_t : public obj_desc_t {
 private:
 	koord pos_off;
 	koord xy_off;
+	sint16 smoke_speed;
 	sint16 smoke_height;
 
 public:
@@ -128,6 +129,10 @@ public:
 
 	// height of chimney in pixel (depends on OBJECT_OFFSET_STEPS==16)
 	sint16 get_smoke_height() const { return smoke_height; }
+
+	// speed of smoke movement (upwards)
+	sint16 get_smoke_speed() const { return smoke_speed; }
+
 };
 
 

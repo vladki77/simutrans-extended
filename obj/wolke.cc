@@ -53,7 +53,7 @@ wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, sint16 h_off, const skin
 wolke_t::~wolke_t()
 {
 	mark_image_dirty( get_image(), 0 );
-	if(  purchase_time != 2499  ) {
+	if(  purchase_time != SMOKE_LIFE - 1 ) {
 		welt->sync_way_eyecandy.remove( this );
 	}
 }
@@ -73,7 +73,7 @@ wolke_t::wolke_t(loadsave_t* const file) :
 image_id wolke_t::get_image() const
 {
 	const skin_desc_t *desc = all_clouds[cloud_nr];
-	return desc->get_image_id( (purchase_time*desc->get_count())/2500 );
+	return desc->get_image_id( (purchase_time*desc->get_count())/(SMOKE_LIFE));
 }
 
 
@@ -106,9 +106,9 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	const image_id old_img = get_image();
 
 	purchase_time += delta_t;
-	if (purchase_time >= 2499) {
+	if (purchase_time >= SMOKE_LIFE - 1) {
 		// delete wolke ...
-		purchase_time = 2499;
+		purchase_time = SMOKE_LIFE - 1;
 		return SYNC_DELETE;
 	}
 	const image_id new_img = get_image();
@@ -116,8 +116,8 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	// move cloud up
 	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12);
 	if (new_yoff != get_yoff() || new_img != old_img) {
-		// move cloud randomly sideways - be consistent with planes - wind blows from NE (right)
-		const sint8 new_xoff = get_xoff() - sim_async_rand(SMOKE_RANDOM + 1);
+		// move cloud randomly sideways - be consistent with airplanes - wind blows from NE (right)
+		const sint8 new_xoff = get_xoff() - SMOKE_SPEED * WIND_SPEED;
 		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
 		if (!get_flag(obj_t::dirty)) {
 			set_flag(obj_t::dirty);
