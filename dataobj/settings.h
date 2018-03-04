@@ -320,6 +320,12 @@ private:
 	uint32 random_mode_commuting;
 	uint32 random_mode_visiting;
 
+	/**
+	* These two settings define how gradients are angled/smoothed.
+	*/
+	uint32 gradient_smoothing_distance_meters;
+	uint32 height_per_level_meters;
+
 public:
 	//Cornering settings
 	//@author: jamespetts
@@ -1166,6 +1172,9 @@ public:
 	uint16 get_max_comfort_preference_percentage() const { return max_comfort_preference_percentage; }
 
 	bool get_rural_industries_no_staff_shortage() const { return rural_industries_no_staff_shortage; }
+
+	uint32 get_gradient_smoothing_distance_meters() const { return gradient_smoothing_distance_meters; }
+	uint32 get_height_per_level_meters() const { return height_per_level_meters; }
 };
 
 #endif 

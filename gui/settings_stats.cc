@@ -264,6 +264,8 @@ void settings_extended_general_stats_t::init( settings_t *sets )
 	INIT_NUM("parallel_ways_forge_cost_percentage_tram", sets->get_parallel_ways_forge_cost_percentage_tram(), 0, 100, gui_numberinput_t::PLAIN, false);
 	INIT_NUM("parallel_ways_forge_cost_percentage_narrowgauge", sets->get_parallel_ways_forge_cost_percentage_narrowgauge(), 0, 100, gui_numberinput_t::PLAIN, false);
 	INIT_NUM("parallel_ways_forge_cost_percentage_air", sets->get_parallel_ways_forge_cost_percentage_air(), 0, 100, gui_numberinput_t::PLAIN, false);
+	INIT_NUM("gradient_smoothing_distance_meters", sets->get_gradient_smoothing_distance_meters(), 0, 25000, gui_numberinput_t::AUTOLINEAR, false); 
+	INIT_NUM("height_per_level_meters", sets->get_height_per_level_meters(), 0, 250, gui_numberinput_t::AUTOLINEAR, false); 
 
 	SEPERATOR;
 	{
@@ -361,6 +363,8 @@ void settings_extended_general_stats_t::read(settings_t *sets)
 	READ_NUM_VALUE(sets->parallel_ways_forge_cost_percentage_tram);
 	READ_NUM_VALUE(sets->parallel_ways_forge_cost_percentage_narrowgauge);
 	READ_NUM_VALUE(sets->parallel_ways_forge_cost_percentage_air);
+	READ_NUM_VALUE(sets->gradient_smoothing_distance_meters);
+	READ_NUM_VALUE(sets->height_per_level_meters);
 
 	uint16 default_increase_maintenance_after_years_other;
 	READ_NUM_VALUE( default_increase_maintenance_after_years_other );

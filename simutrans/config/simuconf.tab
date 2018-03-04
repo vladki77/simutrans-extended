@@ -125,6 +125,10 @@ job_replenishment_per_hundredths_of_months = 100
 # Save the current game when quitting and reload it upon reopening
 reload_and_save_on_quit = 1
 
+# These settings adjust the extent and smoothing of gradients. 
+gradient_smoothing_distance_meters = 125
+height_per_level_meters = 50
+
 ############################### Passenger and mail settings ##############################
 # also pak dependent
 

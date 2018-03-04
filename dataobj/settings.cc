@@ -459,6 +459,9 @@ settings_t::settings_t() :
 	walking_speed = 5;
 
 	random_mode_commuting = random_mode_visiting = 2;
+
+	gradient_smoothing_distance_meters = 125; // Gradient smoothing disabled by default, as this is disabled in effect if this distance is < meters per tile.
+	height_per_level_meters = 50;
 	
 	for(uint8 i = 0; i < 17; i ++)
 	{
@@ -1744,6 +1747,12 @@ void settings_t::rdwr(loadsave_t *file)
 		}
 	}
 
+	if((file->get_extended_version() >= 13 && file->get_extended_revision() >= 6) || file->get_extended_version() >= 14)
+	{
+		file->rdwr_long(gradient_smoothing_distance_meters);
+		file->rdwr_long(height_per_level_meters);
+	}
+
 #ifdef DEBUG_SIMRAND_CALLS
 	for (vector_tpl<const char *>::iterator i = karte_t::random_callers.begin(); i < karte_t::random_callers.end(); ++i)
 	{
@@ -2606,6 +2615,9 @@ void settings_t::parse_simuconf(tabfile_t& simuconf, sint16& disp_width, sint16&
 	max_comfort_preference_percentage = contents.get_int("max_comfort_preference_percentage", max_comfort_preference_percentage);
 
 	rural_industries_no_staff_shortage = contents.get_int("rural_industries_no_staff_shortage", rural_industries_no_staff_shortage); 
+
+	gradient_smoothing_distance_meters = contents.get_int("gradient_smoothing_distance_meters", gradient_smoothing_distance_meters);
+	height_per_level_meters = contents.get_int("height_per_level_meters", height_per_level_meters); 
 
 	// OK, this is a bit complex.  We are at risk of loading the same livery schemes repeatedly, which
 	// gives duplicate livery schemes and utter confusion.
