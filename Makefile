@@ -4,7 +4,7 @@ CFG ?= default
 
 BACKENDS      = allegro gdi opengl sdl sdl2 mixer_sdl posix
 COLOUR_DEPTHS = 0 16
-OSTYPES       = amiga beos cygwin freebsd haiku linux mingw32 mingw64 mac
+OSTYPES       = amiga beos cygwin freebsd haiku linux mingw32 mingw64 mac openbsd
 
 ifeq ($(findstring $(BACKEND), $(BACKENDS)),)
   $(error Unkown BACKEND "$(BACKEND)", must be one of "$(BACKENDS)")
@@ -69,15 +69,23 @@ ifeq ($(OSTYPE),mac)
   LDFLAGS += -stdlib=libstdc++
 endif
 
-ifeq ($(OSTYPE),mingw32 mingw64)
+ifeq ($(OSTYPE), mingw64)
   SOURCES += clipboard_w32.cc
 else
-  SOURCES += clipboard_internal.cc
+	ifeq ($(OSTYPE),mingw32)
+	  SOURCES += clipboard_w32.cc
+	else
+	  SOURCES += clipboard_internal.cc
+  endif
+endif
+
+ifeq ($(OSTYPE),openbsd)
+  CXXFLAGS +=  -std=c++11
 endif
 
 LIBS += -lbz2 -lz
 
- CFLAGS +=  -std=gnu++11
+CXXFLAGS +=  -std=gnu++11
 
 ALLEGRO_CONFIG ?= allegro-config
 SDL_CONFIG     ?= sdl-config
@@ -143,9 +151,15 @@ ifneq ($(MULTI_THREAD),)
 endif
 
 ifneq ($(WITH_REVISION),)
-  REV = $(shell git rev-parse --short HEAD)
-  ifneq ($(REV),)
-    CFLAGS  += -DREVISION="$(REV)"
+  ifeq ($(shell expr $(WITH_REVISION) \>= 1), 1)
+    ifeq ($(shell expr $(WITH_REVISION) \>= 2), 1)
+      REV = $(WITH_REVISION)
+    else
+      REV = $(shell git rev-parse --short=7 HEAD)
+    endif
+    ifneq ($(REV),)
+      CFLAGS  += -DREVISION="$(REV)"
+    endif
   endif
 endif
 
@@ -175,6 +189,7 @@ SOURCES += descriptor/reader/ground_reader.cc
 SOURCES += descriptor/reader/groundobj_reader.cc
 SOURCES += descriptor/reader/image_reader.cc
 SOURCES += descriptor/reader/imagelist2d_reader.cc
+SOURCES += descriptor/reader/imagelist3d_reader.cc
 SOURCES += descriptor/reader/imagelist_reader.cc
 SOURCES += descriptor/reader/obj_reader.cc
 SOURCES += descriptor/reader/pedestrian_reader.cc
@@ -222,7 +237,6 @@ SOURCES += dataobj/koord3d.cc
 SOURCES += dataobj/loadsave.cc
 SOURCES += dataobj/marker.cc
 SOURCES += dataobj/powernet.cc
-SOURCES += dataobj/records.cc
 SOURCES += dataobj/ribi.cc
 SOURCES += dataobj/route.cc
 SOURCES += dataobj/scenario.cc
@@ -252,6 +266,7 @@ SOURCES += freight_list_sorter.cc
 SOURCES += gui/ai_option_t.cc
 SOURCES += gui/banner.cc
 SOURCES += gui/baum_edit.cc
+SOURCES += gui/base_info.cc
 SOURCES += gui/citybuilding_edit.cc
 SOURCES += gui/citylist_frame_t.cc
 SOURCES += gui/citylist_stats_t.cc
@@ -313,6 +328,7 @@ SOURCES += gui/kennfarbe.cc
 SOURCES += gui/label_info.cc
 SOURCES += gui/labellist_frame_t.cc
 SOURCES += gui/labellist_stats_t.cc
+SOURCES += gui/line_class_manager.cc
 SOURCES += gui/line_item.cc
 SOURCES += gui/line_management_gui.cc
 SOURCES += gui/load_relief_frame.cc
@@ -323,7 +339,9 @@ SOURCES += gui/message_option_t.cc
 SOURCES += gui/message_stats_t.cc
 SOURCES += gui/messagebox.cc
 SOURCES += gui/money_frame.cc
+SOURCES += gui/onewaysign_info.cc
 SOURCES += gui/optionen.cc
+SOURCES += gui/overtaking_mode.cc
 SOURCES += gui/pakselector.cc
 SOURCES += gui/password_frame.cc
 SOURCES += gui/player_frame_t.cc
@@ -341,13 +359,17 @@ SOURCES += gui/signal_spacing.cc
 SOURCES += gui/simwin.cc
 SOURCES += gui/sound_frame.cc
 SOURCES += gui/sprachen.cc
+SOURCES += gui/times_history.cc
+SOURCES += gui/times_history_container.cc
+SOURCES += gui/times_history_entry.cc
 SOURCES += gui/city_info.cc
 SOURCES += gui/station_building_select.cc
 SOURCES += gui/themeselector.cc
-SOURCES += gui/obj_info.cc
-SOURCES += gui/trafficlight_info.cc
-SOURCES += gui/welt.cc
 SOURCES += gui/tool_selector
+SOURCES += gui/trafficlight_info.cc
+SOURCES += gui/obj_info.cc
+SOURCES += gui/vehicle_class_manager.cc
+SOURCES += gui/welt.cc
 SOURCES += network/checksum.cc
 SOURCES += network/memory_rw.cc
 SOURCES += network/network.cc
@@ -376,6 +398,8 @@ SOURCES += script/api/api_convoy.cc
 SOURCES += script/api/api_gui.cc
 SOURCES += script/api/api_factory.cc
 SOURCES += script/api/api_halt.cc
+SOURCES += script/api/api_include.cc
+SOURCES += script/api/api_line.cc
 SOURCES += script/api/api_map_objects.cc
 SOURCES += script/api/api_obj_desc.cc
 SOURCES += script/api/api_obj_desc_base.cc
@@ -490,10 +514,17 @@ endif
 ifeq ($(BACKEND),sdl)
   SOURCES += simsys_s.cc
   ifeq ($(OSTYPE),mac)
-    # Core Audio (Quicktime) base sound system routines
-    SOURCES += sound/core-audio_sound.mm
-    SOURCES += music/core-audio_midi.mm
-    LIBS    += -framework Foundation -framework QTKit
+		ifeq ($(AV_FOUNDATION),1)
+			# Core Audio (AVFoundation) base sound system routines
+			SOURCES += sound/AVF_core-audio_sound.mm
+			SOURCES += music/AVF_core-audio_midi.mm
+			LIBS    += -framework Foundation -framework AVFoundation
+		else
+			# Core Audio (Quicktime) base sound system routines
+			SOURCES += sound/core-audio_sound.mm
+			SOURCES += music/core-audio_midi.mm
+			LIBS    += -framework Foundation -framework QTKit
+		endif
   else
     SOURCES  += sound/sdl_sound.cc
     ifeq ($(findstring $(OSTYPE), cygwin mingw32 mingw64),)
@@ -525,10 +556,17 @@ endif
 ifeq ($(BACKEND),sdl2)
   SOURCES += simsys_s2.cc
   ifeq ($(OSTYPE),mac)
-    # Core Audio (Quicktime) base sound system routines
-    SOURCES += sound/core-audio_sound.mm
-    SOURCES += music/core-audio_midi.mm
-    LIBS    += -framework Foundation -framework QTKit
+		ifeq ($(AV_FOUNDATION),1)
+			# Core Audio (AVFoundation) base sound system routines
+			SOURCES += sound/AVF_core-audio_sound.mm
+			SOURCES += music/AVF_core-audio_midi.mm
+			LIBS    += -framework Foundation -framework AVFoundation
+		else
+			# Core Audio (Quicktime) base sound system routines
+			SOURCES += sound/core-audio_sound.mm
+			SOURCES += music/core-audio_midi.mm
+			LIBS    += -framework Foundation -framework QTKit
+		endif
   else
     SOURCES  += sound/sdl_sound.cc
     ifeq ($(findstring $(OSTYPE), cygwin mingw32 mingw64),)
@@ -567,7 +605,7 @@ ifeq ($(BACKEND),mixer_sdl)
 	else
 	   SDL_LDFLAGS := $(shell $(SDL_CONFIG) --libs)
 	endif
- 
+
   endif
   CFLAGS += $(SDL_CFLAGS)
   LIBS   += $(SDL_LDFLAGS) -lSDL_mixer
@@ -576,10 +614,17 @@ endif
 ifeq ($(BACKEND),opengl)
   SOURCES += simsys_opengl.cc
   ifeq ($(OSTYPE),mac)
-    # Core Audio (Quicktime) base sound system routines
-    SOURCES += sound/core-audio_sound.mm
-    SOURCES += music/core-audio_midi.mm
-    LIBS    += -framework Foundation -framework QTKit
+		ifeq ($(AV_FOUNDATION),1)
+			# Core Audio (AVFoundation) base sound system routines
+			SOURCES += sound/AVF_core-audio_sound.mm
+			SOURCES += music/AVF_core-audio_midi.mm
+			LIBS    += -framework Foundation -framework AVFoundation
+		else
+			# Core Audio (Quicktime) base sound system routines
+			SOURCES += sound/core-audio_sound.mm
+			SOURCES += music/core-audio_midi.mm
+			LIBS    += -framework Foundation -framework QTKit
+		endif
   else
     SOURCES  += sound/sdl_sound.cc
     ifeq ($(findstring $(OSTYPE), cygwin mingw32 mingw64),)
@@ -607,7 +652,7 @@ ifeq ($(BACKEND),opengl)
     ifeq ($(OSTYPE),mingw32 mingw64)
       LIBS += -lglew32 -lopengl32
     else
-      LIBS += -lglew32 -lGL
+      LIBS += -lGLEW -lGL
     endif
   endif
 endif

@@ -151,17 +151,17 @@ unsigned depot_t::get_max_convoy_length(waytype_t wt)
 void depot_t::call_depot_tool( char tool, convoihandle_t cnv, const char *extra, uint16 livery_scheme_index)
 {
 	// call depot tool
-	tool_t *tool_tmp = create_tool( TOOL_BUILD_DEPOT_TOOL | SIMPLE_TOOL );
+	tool_t *tmp_tool = create_tool( TOOL_CHANGE_DEPOT | SIMPLE_TOOL );
 	cbuffer_t buf;
 	buf.printf( "%c,%s,%hu,%hu", tool, get_pos().get_str(), cnv.get_id(), livery_scheme_index );
 	if(  extra  ) {
 		buf.append( "," );
 		buf.append( extra );
 	}
-	tool_tmp->set_default_param(buf);
-	welt->set_tool( tool_tmp, get_owner() );
+	tmp_tool->set_default_param(buf);
+	welt->set_tool( tmp_tool, get_owner() );
 	// since init always returns false, it is safe to delete immediately
-	delete tool_tmp;
+	delete tmp_tool;
 }
 
 
@@ -193,9 +193,9 @@ void depot_t::convoi_arrived(convoihandle_t acnv, bool fpl_adjust)
 			acnv->unregister_stops();
 		}
 #ifdef MULTI_THREAD
-		world()->stop_path_explorer();
+		world()->await_path_explorer();
 #endif
-		path_explorer_t::refresh_all_categories(true);
+		path_explorer_t::refresh_all_categories(false);
 	}
 
 	// Clean up the vehicles -- get rid of freight, etc.  Do even when loading, just in case.
@@ -272,7 +272,7 @@ void depot_t::upgrade_vehicle(convoihandle_t cnv, const vehicle_desc_t* vb)
 					}
 				}		
 				//Check whether this is a Garrett type vehicle (this is code for the exceptional case where a Garrett is upgraded to another Garrett)
-				if(cnv->get_vehicle(0)->get_desc()->get_power() == 0 && cnv->get_vehicle(0)->get_desc()->get_capacity() == 0)
+				if(cnv->get_vehicle(0)->get_desc()->get_power() == 0 && cnv->get_vehicle(0)->get_desc()->get_total_capacity() == 0)
 				{
 					// Possible Garrett
 					const uint8 count = cnv->get_vehicle(0)->get_desc()->get_trailer_count();
@@ -410,14 +410,6 @@ convoihandle_t depot_t::copy_convoi(convoihandle_t old_cnv, bool local_execution
 	if(  old_cnv.is_bound()  &&  !convoihandle_t::is_exhausted()  &&
 		old_cnv->get_vehicle_count() > 0  &&  get_waytype() == old_cnv->front()->get_desc()->get_waytype() )
 	{
-		if( old_cnv->get_schedule() && (!old_cnv->get_schedule()->is_editing_finished()) )
-		{           
-			if(local_execution)
-			{
-				create_win( new news_img("Schedule is incomplete/not finished"), w_time_delete, magic_none);
-			}
-			return convoihandle_t();
-        }
 		convoihandle_t new_cnv = add_convoi( false );
 		new_cnv->set_name(old_cnv->get_internal_name());
 		new_cnv->set_livery_scheme_index(old_cnv->get_livery_scheme_index());
@@ -453,6 +445,16 @@ convoihandle_t depot_t::copy_convoi(convoihandle_t old_cnv, bool local_execution
 					}
 					// buy new vehicle
 					new_vehicle = vehicle_builder_t::build(get_pos(), get_owner(), NULL, info, false, old_cnv->get_livery_scheme_index());
+				}
+
+				// Reassign the classes:
+				uint8 classes_to_check = info->get_number_of_classes();
+				for (int j = 0; j < classes_to_check; j++)
+				{
+					if (old_cnv->get_vehicle(i)->get_reassigned_class(j) != j)
+					{
+						new_vehicle->set_class_reassignment(j, old_cnv->get_vehicle(i)->get_reassigned_class(j));
+					}
 				}
 				// append new vehicle
 				append_vehicle(new_cnv, new_vehicle, false, local_execution);
@@ -553,7 +555,7 @@ bool depot_t::start_convoi(convoihandle_t cnv, bool local_execution)
 
 	if (cnv.is_bound() && cnv->get_schedule() && !cnv->get_schedule()->empty()) {
 		// if next schedule entry is this depot => advance to next entry
-		const koord3d& cur_pos = cnv->get_schedule()->get_current_eintrag().pos;
+		const koord3d& cur_pos = cnv->get_schedule()->get_current_entry().pos;
 		if (cur_pos == get_pos()) {
 			cnv->get_schedule()->advance();
 		}
@@ -598,7 +600,7 @@ bool depot_t::start_convoi(convoihandle_t cnv, bool local_execution)
 				create_win( new news_img("Diese Zusammenstellung kann nicht fahren!\n"), w_time_delete, magic_none);
 			}
 		}
-		else if(  !cnv->calc_route(this->get_pos(), cur_pos, cnv->get_min_top_speed())  ) {
+		else if(  cnv->calc_route(this->get_pos(), cur_pos, cnv->get_min_top_speed()) != route_t::valid_route) {
 			// no route to go ...
 			if(local_execution) {
 				static cbuffer_t buf;
@@ -607,9 +609,12 @@ bool depot_t::start_convoi(convoihandle_t cnv, bool local_execution)
 				create_win( new news_img(buf), w_time_delete, magic_none);
 			}
 		}
+		else if (!(cnv->front()->get_desc()->get_basic_constraint_prev(cnv->front()->is_reversed()) & vehicle_desc_t::can_be_head)) {
+			// Is there a cab at the front end of convoy?
+			create_win(new news_img("Cannot start: no cab at the front of the convoy."), w_time_delete, magic_none);
+		}
 		else {
 			// convoi can start now
-			welt->sync.add( cnv.get_rep() );
 			cnv->start();
 
 			// remove from depot lists
@@ -755,7 +760,7 @@ const char * depot_t:: is_deletable(const player_t *player)
 }
 
 
-slist_tpl<vehicle_desc_t*> & depot_t::get_vehicle_type()
+slist_tpl<vehicle_desc_t*> const & depot_t::get_vehicle_type()
 {
 	return vehicle_builder_t::get_info(get_waytype());
 }
@@ -816,7 +821,8 @@ void depot_t::new_month()
 		get_owner()->book_vehicle_maintenance( -fixed_cost_costs, get_waytype() );
 	}
 
-	stadt_t* city = welt->get_city(get_pos().get_2d());
+	const planquadrat_t* tile = welt->access(get_pos().get_2d());
+	stadt_t* city = tile ? tile->get_city() : NULL;
 	if(city && get_stadt() == NULL)
 	{		
 		// The depot has joined a city by dint of growth.
@@ -877,10 +883,12 @@ bool depot_t::is_suitable_for( const vehicle_t * test_vehicle, const uint16 trac
 void depot_t::add_to_world_list(bool lock)
 {
 	welt->add_building_to_world_list(this);
-	stadt_t* city = welt->get_city(get_pos().get_2d());
+	const planquadrat_t* tile = welt->access(get_pos().get_2d()); 
+	stadt_t* city = tile ? tile->get_city() : NULL; 
 	if(city)
 	{		
 		set_stadt(city);
 		city->update_city_stats_with_building(this, false);
 	}
 }
+

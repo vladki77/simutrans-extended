@@ -100,18 +100,13 @@ public:
 class private_car_t : public road_user_t, public overtaker_t
 {
 private:
-	
+
 	koord origin;
 
 	const citycar_desc_t *desc;
 
-	//route_t route;
-	//uint16 route_index;
-
 	// prissi: time to life in blocks
-#ifdef DESTINATION_CITYCARS
 	koord target;
-#endif
 	koord3d pos_next_next;
 
 	/**
@@ -122,7 +117,11 @@ private:
 
 	uint32 ms_traffic_jam;
 
+	koord3d last_tile_marked_as_stopped;
+
 	grund_t* hop_check();
+
+	void calc_disp_lane();
 
 protected:
 	void rdwr(loadsave_t *file);
@@ -139,6 +138,8 @@ public:
 	private_car_t(grund_t* gr, koord target);
 
 	virtual ~private_car_t();
+
+	virtual void rotate90();
 
 	static stringhashtable_tpl<const citycar_desc_t *> table;
 
@@ -179,12 +180,18 @@ public:
 	static bool successfully_loaded();
 
 	// since we must consider overtaking, we use this for offset calculation
-	virtual void get_screen_offset( int &xoff, int &yoff, const sint16 raster_width ) const;
+	void get_screen_offset( int &xoff, int &yoff, const sint16 raster_width, bool prev_based ) const;
+	virtual void get_screen_offset( int &xoff, int &yoff, const sint16 raster_width ) const { get_screen_offset(xoff,yoff,raster_width,false); }
 
 	virtual overtaker_t *get_overtaker() { return this; }
 
 	// Overtaking for city cars
 	virtual bool can_overtake(overtaker_t *other_overtaker, sint32 other_speed, sint16 steps_other);
+
+	virtual vehicle_base_t* other_lane_blocked(const bool only_search_top) const;
+	vehicle_base_t* is_there_car(grund_t *gr) const; // This is a helper function of other_lane_blocked
+
+	virtual void reflesh(sint8,sint8);
 
 	void * operator new(size_t s);
 	void operator delete(void *p);

@@ -165,7 +165,7 @@ void crossing_logic_t::set_state( crossing_state_t new_state )
 {
 	// play sound (if there and closing)
 	if(new_state==CROSSING_CLOSED  &&  desc->get_sound()>=0  &&  !welt->is_fast_forward()) {
-		welt->play_sound_area_clipped(crossings[0]->get_pos().get_2d(), desc->get_sound());
+		welt->play_sound_area_clipped(crossings[0]->get_pos().get_2d(), desc->get_sound(), overheadlines_wt);
 	}
 
 	if(new_state!=state) {
@@ -307,7 +307,7 @@ void crossing_logic_t::add( crossing_t *start_cr, crossing_state_t state )
 			break;
 		}
 		crossing_t *found_cr = gr->find<crossing_t>();
-		if(found_cr==NULL  ||  !have_crossings_same_wt(found_cr->get_desc(),start_cr->get_desc())) {
+		if(found_cr==NULL  ||  !have_crossings_same_wt(found_cr->get_desc(),start_cr->get_desc())  ||  start_cr->get_dir() != found_cr->get_dir()) {
 			break;
 		}
 		crossings.append( found_cr );
@@ -324,7 +324,7 @@ void crossing_logic_t::add( crossing_t *start_cr, crossing_state_t state )
 			break;
 		}
 		crossing_t *found_cr = gr->find<crossing_t>();
-		if(found_cr==NULL  ||  !have_crossings_same_wt(found_cr->get_desc(),start_cr->get_desc())) {
+		if(found_cr==NULL  ||  !have_crossings_same_wt(found_cr->get_desc(),start_cr->get_desc())  ||  start_cr->get_dir() != found_cr->get_dir()) {
 			break;
 		}
 		crossings.append( found_cr );

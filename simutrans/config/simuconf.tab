@@ -125,6 +125,28 @@ job_replenishment_per_hundredths_of_months = 100
 # Save the current game when quitting and reload it upon reopening
 reload_and_save_on_quit = 1
 
+# The path explorer is the system that calculates how passengers, mail and goods should
+# get from one place in the transport network to another. On larger maps, it takes a lot
+# of computational effort to calculate this, so the calculation is spread out over time.
+# Each step of the simulation, a certain amount of the pathing is calculated, and, once
+# the calculation is complete, the new calculated data are swapped for the old data.
+#
+# This setting allows the amount of work that the path explorer is allowed to do each 
+# step of the simulation to be customised. The higher the number, the more work that will
+# be done each step. The current default is 64. When the path explorer was first written
+# in 2010, the default was 24. Setting this number too low will result in the paths taking
+# a long time to refresh. Setting this number too high will result in the game becoming
+# less responsive to user input on larger maps. 
+#
+# Note that, in an online game, this setting is dictated by the server.
+path_explorer_time_midpoint = 64
+
+# If the below setting should be enabled, the pathing data representing all the routes
+# between all the various stops are saved. This greatly reduces the time that it takes
+# to load very large saved games, but also very considerably increases the size of those
+# saved games (by >4x). 
+save_path_explorer_data = 1
+
 ############################### Passenger and mail settings ##############################
 # also pak dependent
 
@@ -141,6 +163,34 @@ electricity_multiplier = 20
 growthfactor_villages = 400
 growthfactor_cities = 200
 growthfactor_capitals = 100
+
+# The rate at which towns grow depends on their size. There are three different size categories:
+# "Villages", "Cities" and "Capitals". The following settings define the thresholds (in numbers 
+# of population) above which towns become "Cities" and "Capitals". Anything smaller than 
+# city_threshold_size is a "Village". These settings are overriden if any value in 
+# city_threshold_percentage or capital_threshold_percentage be set. 
+
+city_threshold_size = 2500
+capital_threshold_size = 25000
+
+# These values determine which rates of town growth apply depending, not on the absolute size
+# of the city, but rather its size relative to other cities in the game. If capital_threshold_percentage
+# is 5, for example, any city in the top 5% of cities by population count will be a capital. 
+# These settings override the absolute values in city_threshold_size and capital_threshold_size
+# unless their values are 0, which is the default. It is recommended to use these rather than absolute
+# values, especially in longer games, where all towns may grow to the size of "capitals" eventually.
+
+city_threshold_percentage = 20
+capital_threshold_percentage = 2
+
+# These values are used in the city generation algorithm to determine the maximum size of cities.
+# max_city_size is the maximum size, in citizens, of any city at the point of generation.
+# max_small_city_size is the size, in citizens, of any city other than a "big city" at the point of generation. 
+#
+# TIP: Set a lower number for these values the earlier that the game is started.
+
+max_city_size = 20000
+max_small_city_size = 3000
 
 # Enable this to use the old algorithm for city growth from Standard.
 # NOTE: The renovation_percentage in cityrules.tab should be increased if this be done.
@@ -219,6 +269,42 @@ commuting_trip_chance_percent = 67
 random_mode_commuting = 2
 random_mode_visiting = 2
 
+# Some passengers who are not able to find a route will be content to go to an alternative destination. 
+# This is set separately for visiting passengers and commuting passengers. It can either be set in
+# absolute figures using max_alternative_destinations_visiting and max_alternative_destinations_commuting,
+# or set as a proportion of the total number of jobs and total level of visitor demand, using 
+# max_alternative_destinations_per_visitor_demand_millionths and max_alternative_destinations_per_job_millionths.
+# Using the relative settings is recommended, as this scales much better to the map size.
+# 
+# This is specified as the maximum number of alternative destinations, as the actual number for any
+# given packet of passengers will be randomised between zero and this number. 
+#
+# This figure strongly affects how many passengers will travel, and also can have a significant effect on
+# the computational load.
+
+#max_alternative_destinations_commuting = 6
+#max_alternative_destinations_visiting = 12
+#min_alternative_destinations_commuting = 2
+#min_alternative_destinations_visiting = 1
+
+max_alternative_destinations_per_visitor_demand_millionths = 2750
+max_alternative_destinations_per_job_millionths = 5000
+
+min_alternative_destinations_per_visitor_demand_millionths = 750
+min_alternative_destinations_per_job_millionths = 2500
+
+# Passengers who can afford to travel in higher class accommodation on a convoy that also has
+# lower class accommodation will only spend the extra money if they consider the additional
+# comfort worthwhile. Each passenger's preference for this is randomised on creation. The
+# minimum is the same as the maximum comfortable journey time (i.e., at this minimum level,
+# the passengers will only pay to travel in more comfortable accommodation if the journey
+# time exceeds the maximum comfortable journey time for the lower class of accommodation).
+# The maximum a percentage of this figure, set below. For example, if this is set to 500%,
+# passengers will travel in a higher class of accommodation if the journey time is more 
+# than one fifth of the maximum comfortable journey time of the lower class of accommodation.
+
+max_comfort_preference_percentage = 500
+
 ################################## Industry settings #################################
 
 # when a city reaches 2^n times of this number
@@ -248,11 +334,15 @@ electric_promille = 1100
 # true if transformers are allowed underground (default)
 allow_underground_transformers = 1
 
-# with this switch on (default), overcrowded factories will not recieve goods any more
-just_in_time = 1
+# This setting determines the behaviour of industry demand.
+# At 0, industries will always demand goods until their internal storage is full, no matter how many goods are already in transit.
+# At 1, industries will demand enough goods to fill their internal storage initially, then will demand only enough goods to keep up with the demand of their consumers.
+# At 2, industries will demand only enough goods to keep up with the demand of their consumers without trying to fill their internal storage first, but will not demand so many goods that their internal storage is likely to overflow.
+# At 3, industries behave as in 2, save that the internal storage of consumer industries is ignored.
+just_in_time = 2
 
 # How much amount in transport is sent before further distribution stops
-# This is only enabled when "just_in_time" is enabled
+# This is only enabled when "just_in_time" is enabled (i.e. set to a value > 0)
 # The limit is given in percent of factory storage (0=off)
 #
 # This number is scaled to the ratio of the time that it takes the industry to
@@ -270,6 +360,41 @@ factory_arrival_periods = 4
 
 # whether factory's pax/mail demands are enforced or not; default is on
 factory_enforce_demand = 1
+
+# The following settings determine the thresholds for deciding whether an industry is short
+# of staff. 
+# 
+# minimum_staffing_percentage_consumer_industry is for consumer industries (i.e. shops): it
+# is the threshold (in percentage of the total complement of staff) below which the shop
+# must close until more staff can be found. No visiting passengers can start their journeys
+# to a consumer industry whose staffing level is below this proportion.
+#
+# minimum_staffing_percentage_full_production_producer_industry is for producer industries:
+# it is the threshold below which the production of the industry will be scaled back
+# to match the proportion of the available staff. For example, when this setting is at
+# its default value of 80, if the industry has 81% of staff, it produces at full capacity.
+# If the industry has 75% of staff, it produces at 75% of capacity, and so forth.
+
+minimum_staffing_percentage_consumer_industry = 66
+minimum_staffing_percentage_full_production_producer_industry = 80
+
+# If the below setting is enabled, industries situated outside a town will continue
+# to function as normal even if they are short of staff. It is recommended to enable
+# this, as there is currently no way of ensuring that towns are built close enough
+# to industries in the early years to allow those rural industries to produce.
+rural_industries_no_staff_shortage = 1
+
+# This setting will connect every industry not in a town by road to the nearest town 
+# that it can reach whenever an industry is built. The number specifies how far down
+# the rank order of nearest towns that the industry will try to connect to if it cannot
+# connect to the nearest town.
+# 
+# 0 = disabled
+# 1 = try to connect to the nearest town
+# 2 = try to connect to the nearest town, and, if unsuccessful, try to connect to the second nearest town
+# 3 = ...first, second, then third nearest town
+# ...etc.
+auto_connect_industries_and_attractions_by_road = 4
 
 ################################# Display settings ################################
 
@@ -296,6 +421,10 @@ unprotect_abondoned_player_months = 0
 # how long is a diagonal (512: factor 2=1024/512, old way, 724: sqrt(2)=1024/724
 # THIS WILL BE ONLY USED, WHEN THIS FILE IS IN THE pakxyz/config!
 #diagonal_multiplier = 724
+
+# new height for old slopes when old single height savegame loaded with double height pak (default 1=single height, 2=double height)
+# THIS WILL BE ONLY USED, WHEN THIS FILE IS IN THE pakxyz/config!
+#height_conversion_factor = 1
 
 # how height is a tile in z-direction (default 16, TTD 8)
 # THIS WILL BE ONLY USED, WHEN THIS FILE IS IN THE pakxyz/config!
@@ -457,16 +586,26 @@ player_finance_display_account = 1
 # startingmoney[i]=year,money(in 1/10 credits),interpolate (1) or step(0)
 # starting_money[0]=1930,20000000,1
 # starting_money[1]=2030,35000000,1
+ 
+# This setting controls whether players are permitted to buy vehicles after their
+# retirement date. The default, allow_buying_obsolete_vehicles=1, allows players
+# to buy old vehicles by clicking a "Show obsolete" button in the depot / replacer
+# window. This button is not shown if this is set to 0.
+#
+# If this is set to 2, players can buy vehicles after their retirement date, but
+# not after they have become obsolete. 
 
-# allow buying obsolete vehicles (=1) in depot
-allow_buying_obsolete_vehicles = 1
+allow_buying_obsolete_vehicles=1
+
+# If this setting should be enabled, it will be possible to see
+# information about what will happen to certain vehicle types in 
+# the future, specifically, when they will stop being produced and
+# whether they will have any upgrades.
+show_future_vehicle_information = 1
 
 # vehicle can loose a part of their value, when the are once used
 # the loss is given in 1/1000th, i.e 300 mean the value will be 70%
 used_vehicle_reduction = 0
-
-# lowest possible income with speedbonus (1000=1) default 125 (=1/8th)
-bonus_basefactor = 125
 
 # if a convoi runs on a way that belongs to another player, toll may
 # be charged. The number given is the percentage of the running cost
@@ -521,6 +660,9 @@ cst_make_public_months = 60
 # Minimum distance of a city attraction to other special buildings
 #special_building_distance = 3
 
+# Minimum clearance under bridges is 1 or 2 levels? (default = conversion factor)
+#way_height_clearance = 1
+
 # Max. length of initial intercity road connections
 # If you want to speed up map creation, lower this value.
 # If you want more initial intercity roads, raise this value.
@@ -528,7 +670,7 @@ cst_make_public_months = 60
 # 200 seems to be a good compromise between speed and road number
 # note: this will slow down map creation dramatically!
 #
-#intercity_road_length = 200
+intercity_road_length = 1024
 
 # This is the maximum number of tiles that a road, river or canal
 # that is a public right of way may be diverted for an existing
@@ -594,21 +736,26 @@ citycar_way_wear_factor = 2
 # default: asphalt_road
 # (old, 102.2.2 and before) city_road_type = city_road
 
-# now river stuff
-# first river type (should be defined in pak dependent file)
-# The highest number is the smallest. A river with max_speed==0 is not navigavable by ships.
-#river_type[0] = river
-#river_type[1] = small_river
-#river_type[2] = just_the source
+# How many private car routes to process in a step.
+# With a higher number, routing data in game will be updated
+# more frequently. With a lower number, responsiveness will
+# be improved. Turn this down if there are frequent moments
+# of unresponsiveness.
+# 
+# Default: 8
+# Setting to 0 means that all routes will be processed in
+# a step regardless of number.
+max_routes_to_process_in_a_step = 8
 
-# river number (16 gives a few nicely branched rivers)
-#river_number = 16
-
-# min length
-#river_min_length = 16
-
-# max length
-#river_max_length = 320
+# If the following setting is set to 1, private cars will assume
+# that they can reach anywhere on the map irrespective of the actual
+# road network. Private cars will not follow routes, but will drive
+# around semi-randomly at all times.
+#
+# Enabling this might improve performance on slow systems.
+# 
+# Default: 0
+assume_everywhere_connected_by_road = 0
 
 # This is the distance in meters at which train drivers can see signals ahead.
 # Trains have to brake in time for signals which might be at danger, so this
@@ -664,12 +811,18 @@ new_height_map_conversion = 0
 # does not affect public service provider player
 disable_make_way_public = 0
 
-################################# Tree settings #################################
+# This setting alters the revenue for electricity transmission.
+# The figure is a percentage of the default revenue. Default: 100.
+power_revenue_factor_percentage = 100
+
+############################### Landscape settings ###############################
 #  please be careful in changing them, I spent lot of time finding optimals.
 #  those values have impact on no. of spawned trees -> memory consumption
 #
 # Number of trees on square 2 - minimal usable, 3 good, 4 very nice looking
 max_no_of_trees_on_square = 3
+
+# All following tree options are only active during map generation/extension.
 
 # Base forest size - minimal size of forest - map independent
 forest_base_size = 36
@@ -692,7 +845,26 @@ no_tree_climates = 130
 
 # if set, no trees will be created at all (save about 30% memory and
 # the season change will be much smoother on small machines)
-#no_tree = 0
+no_trees = 0
+
+# if set, no lakes will be created at all
+no_lakes = 0
+
+# now river stuff
+# first river type (should be defined in pak dependent file)
+# The highest number is the smallest. A river with max_speed==0 is not navigavable by ships.
+#river_type[0] = river
+#river_type[1] = small_river
+#river_type[2] = just_the source
+
+# river number (16 gives a few nicely branched rivers)
+#river_number = 16
+
+# min length
+#river_min_length = 16
+
+# max length
+#river_max_length = 320
 
 ################################### Time settings ###################################
 
@@ -717,7 +889,7 @@ starting_year = 1930
 starting_month = 1
 
 # Should month be shown in date?
-# (0=no, 1=yes, 2>=show day in japan format=2, us format=3, german=4, japanese no season=5, us no season=6, german no season = 7, hours/minutes scale = 8)
+# (0=no, 1=yes, 2>=show day in japan format=2, us format=3, german=4, japanese no season=5, us no season=6, german no season = 7, hours/minutes scale = 8, japan hours/minutes scale = 9)
 # This is most useful, if you use longer months than the default length (see below)
 # The hours/minutes scale shows the time in hours/minutes as used for determining journey times and other short times. It is the recommended setting. 
 show_month = 8
@@ -737,7 +909,7 @@ bits_per_month = 20
 # other options are "xml", "xml_zipped" and "xml_bzip2"
 # xml detects more errors of broken savegames but files are much larger
 # bzip2 savegames are smaller than zipped but saving/loading takes longer
-saveformat = bzip2
+saveformat = zipped
 
 # Alternate format for faster autosaves
 autosaveformat = zipped
@@ -758,7 +930,8 @@ fullscreen = 0
 
 # For versions of Simutrans compiled to work in a multithreaded system (which will improve
 # certain aspects of performance on multiple core/processor machines), this is the number
-# of threads that will be used. Maximum: 12.
+# of threads that will be used. It is best not to set this number higher than
+# the number of physical cores on your computer. Maximum: 12.
 threads = 6
 
 # maximum size of tool bars (0 = no limit)

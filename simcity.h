@@ -29,6 +29,7 @@ class karte_ptr_t;
 class player_t;
 class fabrik_t;
 class rule_t;
+struct route_range_specification; 
 
 // For private subroutines
 class building_desc_t;
@@ -55,8 +56,8 @@ enum city_cost {
 	HIST_MAIL_TRANSPORTED,	// letters that could be sent
 	HIST_MAIL_GENERATED,	// all letters generated
 	HIST_GOODS_RECIEVED,	// times all storages were not empty
-	HIST_GOODS_NEEDED,		// times sotrages checked
-	HIST_POWER_RECIEVED,	// power consumption 
+	HIST_GOODS_NEEDED,		// times storages checked
+	HIST_POWER_RECIEVED,	// power consumption
 	HIST_POWER_NEEDED,		// Power demand by the city.
 	HIST_CONGESTION,		// Level of congestion in the city, expressed in percent.
 	MAX_CITY_HISTORY		// Total number of items in array
@@ -95,8 +96,8 @@ private:
 	uint16 meters_per_tile_x100;
 
 public:
-	private_car_destination_finder_t(karte_t* w, road_vehicle_t* m, stadt_t* o);	
-	
+	private_car_destination_finder_t(karte_t* w, road_vehicle_t* m, stadt_t* o);
+
 	virtual waytype_t get_waytype() const { return road_wt; };
 	virtual bool check_next_tile( const grund_t* gr ) const;
 
@@ -151,6 +152,9 @@ public:
 	uint16 get_electricity_consumption(sint32 monthyear) const;
 	static void electricity_consumption_init(const std::string &objfilename);
 
+	static uint32 get_minimum_city_distance();
+	static void set_minimum_city_distance(uint32 s);
+
 	/**
 	 * Reads/writes city configuration data from/to a savegame
 	 * called from settings_t::rdwr
@@ -159,7 +163,6 @@ public:
 	 */
 	static void cityrules_rdwr(loadsave_t *file);
 	static void electricity_consumption_rdwr(loadsave_t *file);
-	void set_check_road_connexions(bool value) { check_road_connexions = value; }
 
 	static void set_cluster_factor( uint32 factor ) { stadt_t::cluster_factor = factor; }
 	static uint32 get_cluster_factor() { return stadt_t::cluster_factor; }
@@ -265,7 +268,7 @@ private:
 
 	// This is needed to prevent double counting of incoming traffic.
 	sint32 incoming_private_cars;
-	
+
 	//This is needed because outgoing cars are disregarded when calculating growth.
 	sint32 outgoing_private_cars;
 
@@ -286,16 +289,21 @@ private:
 
 	sint32 number_of_cars;
 
-	/**
-	* Will fill the world's hashtable of tiles
-	* belonging to cities with all the tiles of
-	* this city
-	*/
-	void check_city_tiles(bool del = false);
+	/// Storage for private car routes (1) awaiting processing; and (2) processed (for easy deletion)
+	// We swap between two routing tables to avert the need for copying, which is too expensive.
+	typedef koordhashtable_tpl<koord, vector_tpl<koord3d> > private_car_route_map;
+	private_car_route_map private_car_routes[2];
+	/// This is the set of routes that is currently being used by the running game, 
+	/// not the one that is set aside for multi-threaded insertion by the route-finder.
+	uint32 currently_active_route_map;
 
 public:
 
-	void add_building_to_list(gebaeude_t* building, bool ordered = false, bool map_generation = false);
+	inline uint32 get_currently_active_route_map() const { return currently_active_route_map; }
+	inline uint32 get_currently_inactive_route_map() const { return currently_active_route_map == 1 ? 0 : 1; }
+	void swap_active_route_map() { currently_active_route_map == 0 ? currently_active_route_map = 1 : currently_active_route_map = 0; }
+
+	void add_building_to_list(gebaeude_t* building, bool ordered = false, bool do_not_add_to_world_list = false, bool do_not_update_stats = false);
 
 	/**
 	 * Returns pointer to history for city
@@ -306,9 +314,9 @@ public:
 
 	uint32 stadtinfo_options;
 
-	void set_private_car_trips(uint16 number) 
+	void set_private_car_trips(uint16 number)
 	{
-		// Do not add to the city's history here, as this 
+		// Do not add to the city's history here, as this
 		// will distort the statistics in the city window
 		// for the number of people who have travelled by
 		// private car *from* the city.
@@ -333,6 +341,8 @@ public:
 		city_history_month[0][HIST_MAIL_TRANSPORTED] += mail;
 	}
 
+/* end of history related things */
+
 	//@author: jamespetts
 	void add_power(uint32 p) { city_history_month[0][HIST_POWER_RECIEVED] += p; city_history_year[0][HIST_POWER_RECIEVED] += p; }
 
@@ -340,7 +350,16 @@ public:
 
 	void add_all_buildings_to_world_list();
 
-	/* end of history related thingies */
+	void reset_tiles_for_all_buildings();
+
+	/**
+	* Will fill the world's hashtable of tiles
+	* belonging to cities with all the tiles of
+	* this city
+	*/
+	void check_city_tiles(bool del = false);
+
+	
 private:
 	sint32 best_haus_wert;
 	sint32 best_strasse_wert;
@@ -400,7 +419,7 @@ private:
 	void bewerte_res_com_ind(const koord pos, int &ind, int &com, int &res);
 
 	/**
-	 * Build/renovates a city building at Planquadrat x,y
+	 * Build/renovates a city building at Planquadrat (tile) x,y
 	 */
 	void build_city_building(koord pos, bool new_town, bool map_generation);
 	bool renovate_city_building(gebaeude_t *gb, bool map_generation = false);
@@ -408,6 +427,8 @@ private:
 	// @author neroden
 	const gebaeude_t* get_citybuilding_at(const koord k) const;
 	int get_best_layout(const building_desc_t* h, const koord & k) const;
+	void get_available_building_size(const koord k, vector_tpl<koord> &sizes) const;
+	gebaeude_t* check_tiles_height(gebaeude_t* building, koord pos, uint8 layout, bool map_generation);
 
 	/**
 	 * Build a short road bridge extending from bd in direction.
@@ -454,7 +475,7 @@ private:
 	void bewerte_strasse(koord pos, sint32 rd, const rule_t &regel);
 	void bewerte_haus(koord pos, sint32 rd, const rule_t &regel);
 
-	bool check_road_connexions;
+	bool private_car_route_finding_in_progress = false;
 
 	sint32 traffic_level;
 	void calc_traffic_level();
@@ -469,7 +490,7 @@ public:
 
 	// this function removes houses from the city house list
 	// (called when removed by player, or by town)
-	void remove_gebaeude_from_stadt(gebaeude_t *gb, bool map_generation);
+	void remove_gebaeude_from_stadt(gebaeude_t *gb, bool map_generation, bool original_pos);
 
 	// This is necessary to be separate from add/remove gebaeude_to_stadt
 	// because of the need for the present to retain the existing pattern
@@ -477,10 +498,10 @@ public:
 	void update_city_stats_with_building(gebaeude_t* building, bool remove);
 
 	/**
-	* This function adds buildings to the city building list; 
+	* This function adds buildings to the city building list;
 	* ordered for multithreaded loading.
 	*/
-	void add_gebaeude_to_stadt(gebaeude_t *gb, bool ordered = false, bool map_generation = false);
+	void add_gebaeude_to_stadt(gebaeude_t *gb, bool ordered = false, bool do_not_add_to_world_list = false, bool do_not_update_stats = false);
 
 	static bool compare_gebaeude_pos(const gebaeude_t* a, const gebaeude_t* b)
 	{
@@ -532,8 +553,7 @@ public:
 	sint32 get_homeless()   const { return bev - won; }
 
 	/**
-	 * Gibt den Namen der City zurück.
-	 * "Specifies the name of the town." (Google)
+	 * Return the city name.
 	 * @author Hj. Malthaner
 	 */
 	const char *get_name() const { return name; }
@@ -621,8 +641,11 @@ public:
 	bool get_citygrowth() const { return allow_citygrowth; }
 
 	void step(uint32 delta_t);
+	
+	/// Things that only one city per world step should do.
+	void step_heavy();
 
-	void new_month(bool check);
+	void new_month();
 
 	void add_road_connexion(uint32 journey_time_per_tile, const stadt_t* city);
 	void add_road_connexion(uint32 journey_time_per_tile, const fabrik_t* industry);
@@ -639,10 +662,27 @@ public:
 
 	void generate_private_cars(koord pos, uint32 journey_tenths_of_minutes, koord target, uint8 number_of_passengers);
 
+	/// Stores a private car route in the city ready to be added to road tiles later. This should be thread-safe.
+	void store_private_car_route(vector_tpl<koord3d> route, koord pos);
+
+	/// Clears a private car route to a particular destination, including iterating over road tiles deleting the routes there.
+	void clear_private_car_route(koord pos, bool clear_connected_tables); 
+
+	/// Take stored routes from the newly added list and add them to route tiles, moving the route to the procesed list.
+	void process_private_car_routes();
+	sint32 route_processing_counter = -1;
+#ifdef MULTI_THREAD_ROUTE_PROCESSING
+	void process_private_car_routes_threaded();
+	static void* process_private_car_route_threaded(void* args);
+	void process_private_car_route_range(route_range_specification range);
+	static koord current_key;
+	static stadt_t* current_city;
+#endif
+
 private:
 	/**
 	 * A weighted list of distances
-	 * @author Knightly 
+	 * @author Knightly
 	 */
 	static weighted_vector_tpl<uint32> distances;
 
@@ -716,12 +756,15 @@ public:
 
 	/**
 	* These methods are used for removing a connected city (etc.)
-	* from the list when these objects are deleted, to prevent 
+	* from the list when these objects are deleted, to prevent
 	* acces violations.
 	*/
 	void remove_connected_city(stadt_t* city);
 	void remove_connected_industry(fabrik_t* fab);
 	void remove_connected_attraction(gebaeude_t* attraction);
+
+	bool get_private_car_route_finding_in_progress() const { return private_car_route_finding_in_progress; }
+	void set_private_car_route_finding_in_progress(bool value) { private_car_route_finding_in_progress = value; }
 
 	// @author: jamespetts
 	// September 2010

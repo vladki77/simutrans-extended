@@ -47,6 +47,15 @@ private:
 				return i;
 			}
 		}
+		
+		if (size < 65535)
+		{
+			// Enlarge the array before searching old handles.
+			// This is slightly less efficient, but minimises handle
+			// duplication, which can cause problems when handles are
+			// used as indices.
+			return enlarge();
+		}
 
 		// scan whole array
 		for(  i=1;  i<size;  i++  ) {
@@ -102,9 +111,7 @@ public:
 	 */
 	static void init(const uint16 n)
 	{
-		if(data) {
-			delete [] data;
-		}
+		delete [] data;
 		size = n;
 		data = new T* [size];
 
@@ -179,7 +186,6 @@ public:
 			if(  id!=0  ) {
 				dbg->fatal("quickstone<T>::quickstone_tpl(T*,uint16)","wants to assign null pointer to non-null index");
 			}
-			assert(id==0);
 			// all NULL pointers are mapped to entry 0
 			entry = 0;
 		}
@@ -198,10 +204,10 @@ public:
 					return false;
 				}
 			}
-			// no handles left => cannot extent
+			// no handles left => cannot extend
 			return true;
 		}
-		// can extent in any case => ok
+		// can extend in any case => ok
 		return false;
 	}
 
@@ -243,14 +249,23 @@ public:
 	 * @return the index into the tombstone table. May be used as
 	 * an ID for the referenced object.
 	 */
-	uint16 get_id() const { return entry; }
+	inline uint16 get_id() const { return entry; }
 
 	/**
 	 * For read/write from/to any storage (file or memory) with the appropriate interface
 	 * @author Knightly
 	 */
 	template <class STORAGE>
-	void rdwr(STORAGE *store) { store->rdwr_short(entry); }
+	void rdwr(STORAGE *store) 
+	{ 
+		store->rdwr_short(entry); 
+		if (entry > next && next < 65534)
+		{
+			// This makes sure that "next" always searches to the end of the array
+			// before returning to the beginning again. 
+			next = entry + 1;
+		}
+	}
 
 	/**
 	 * Sets the current id: Needed to recreate stuff via network.

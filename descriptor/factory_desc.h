@@ -48,11 +48,11 @@ class field_group_desc_t : public obj_desc_t {
 	friend class factory_field_group_reader_t;
 
 private:
-	uint16 probability;		// between 0 ...10000
-	uint16 max_fields;		// maximum number of fields around a single factory
-	uint16 min_fields;		// minimum number of fields around a single factory
-	uint16 start_fields;	// number of fields between min and start_fields to spawn on creation
-	uint16 field_classes;	// number of field classes
+	uint16 probability;			// between 0 ...10000
+	uint16 max_fields;			// maximum number of fields around a single factory
+	uint16 min_fields;			// minimum number of fields around a single factory
+	uint16 start_fields;		// number of fields between min and start_fields to spawn on creation
+	uint16 field_classes;		// number of field classes
 
 	weighted_vector_tpl<uint16> field_class_indices;
 
@@ -219,13 +219,13 @@ public:
 	enum site_t { Land, Water, City };
 
 private:
-	site_t placement; //"placement" (Babelfish)
-	uint16 productivity; //"productivity" (Babelfish)
-	uint16 range; //"range" (Babelfish)
+	site_t placement; 
+	uint16 productivity; 
+	sint32 range;
 	uint16 distribution_weight;	// probability of construction of this factory
 	uint8 color; //"identification colour code" (Babelfish)
-	uint16 supplier_count; //"supplier" (Babelfish)
-	uint16 product_count; //"products" (Babelfish)
+	uint16 supplier_count; 
+	uint16 product_count; 
 	uint8 fields;	// only if there are any ...
 	uint16 pax_level; // Kept for backwards compatibility only. This is now read from the associated gebaeude_t object.
 	uint16 electricity_proportion; // Modifier of electricity consumption (a legacy setting for Extended only)
@@ -244,8 +244,9 @@ private:
 	uint16 mail_demand; // Kept for backwards compatibility only. This is now read from the associated gebaeude_t object.
 	uint16 base_max_distance_to_consumer;
 	uint16 max_distance_to_consumer;
-	sint16 sound_id;
+	uint16 sound_id;
 	uint32 sound_interval;
+	uint8 field_output_divider; // The number by which the total production of all fields is divided.
 
 public:
 
@@ -273,8 +274,10 @@ public:
 	uint16 get_supplier_count() const { return supplier_count; } 
 	uint16 get_product_count() const { return product_count; } 
 
-	bool is_consumer_only() const { return product_count    == 0; }
+	bool is_consumer_only() const { return product_count  == 0; }
 	bool is_producer_only() const { return supplier_count == 0; }
+
+	bool get_accepts_these_goods(const goods_desc_t* input) const; 
 
 	/* where to build */
 	site_t get_placement() const { return placement; }
@@ -284,7 +287,7 @@ public:
 
 	void set_productivity(int p) { productivity=p; }
 	int get_productivity() const { return productivity; }
-	int get_range() const { return range; } 
+	sint32 get_range() const { return range; } 
 
 	/* level for mail and passenger generation */
 	int get_pax_level() const { return pax_level; }
@@ -296,7 +299,7 @@ public:
 
 	const factory_desc_t *get_upgrades(int i) const { return (i >= 0 && i < upgrades) ? get_child<factory_desc_t>(2 + supplier_count + product_count + fields + i) : NULL; }
 
-	int get_upgrades_count() const { return upgrades; }
+	sint32 get_upgrades_count() const { return upgrades; }
 
 	uint16 get_expand_probability() const { return expand_probability; }
 	uint16 get_expand_minumum() const { return expand_minimum; }
@@ -311,23 +314,26 @@ public:
 	uint16 get_mail_demand() const { return mail_demand; }
 
 	// more effects when producing
-	sint8 get_sound() const { return sound_id; }
+	sint16 get_sound() const { return sound_id; }
 	uint32 get_sound_interval_ms() const { return sound_interval; }
 	
 	uint16 get_max_distance_to_consumer() const { return max_distance_to_consumer; }
+
+	uint8 get_field_output_divider() const { return field_output_divider; }
 
 	void set_scale(uint16 scale_factor)
 	{
 		if(base_max_distance_to_consumer < 65535)
 		{
-			uint32 mdc = (uint32)max_distance_to_consumer;
-			mdc *= 1000;
+			uint32 mdc = (uint32)base_max_distance_to_consumer;
+			mdc *= 1000u;
 			mdc /= scale_factor;
 			max_distance_to_consumer = (uint16)mdc;
 		}
 	}
 
 	void calc_checksum(checksum_t *chk) const;
+	bool get_accepts_these_goods(const goods_desc_t* input);
 };
 
 #endif
