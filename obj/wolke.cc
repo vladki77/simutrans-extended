@@ -33,7 +33,7 @@ bool wolke_t::register_desc(const skin_desc_t* desc)
 
 
 
-wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, sint16 h_off, const skin_desc_t* desc ) :
+wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, sint16 h_off, sint16 speed, const skin_desc_t* desc ) :
 #ifdef INLINE_OBJ_TYPE
     obj_no_info_t(obj_t::sync_wolke, pos)
 #else
@@ -42,6 +42,7 @@ wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, sint16 h_off, const skin
 {
 	cloud_nr = all_clouds.index_of(desc);
 	smoke_height = h_off;
+	smoke_speed = speed;
 	base_y_off = clamp( (sint16)y_off - smoke_height, -128, 127 );
 	set_xoff( x_off );
 	set_yoff( base_y_off );
@@ -114,10 +115,10 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	const image_id new_img = get_image();
 
 	// move cloud up
-	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12);
+	const sint8 new_yoff = base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * smoke_speed) >> 12);
 	if (new_yoff != get_yoff() || new_img != old_img) {
 		// move cloud randomly sideways - be consistent with airplanes - wind blows from NE (right)
-		const sint8 new_xoff = get_xoff() - SMOKE_SPEED * WIND_SPEED;
+		const sint8 new_xoff = get_xoff() - smoke_speed * WIND_SPEED;
 		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
 		if (!get_flag(obj_t::dirty)) {
 			set_flag(obj_t::dirty);
@@ -141,7 +142,7 @@ void wolke_t::rotate90()
 	obj_t::rotate90();
 	// .. and recalc height offsets
 	base_y_off = clamp( (sint16)get_yoff() - smoke_height, -128, 127 );
-	set_yoff( base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * SMOKE_SPEED) >> 12) );
+	set_yoff( base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * smoke_speed) >> 12) );
 }
 
 /***************************** just for compatibility, the old raucher and smoke clouds *********************************/
