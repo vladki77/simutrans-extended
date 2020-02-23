@@ -178,7 +178,7 @@ obj_desc_t *factory_smoke_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 	y = decode_sint16(p);
 	desc->smoke_height = y;
 
-	DBG_DEBUG("factory_product_reader_t::read_node()","zeitmaske=%d (size %i)",node.size);
+	DBG_DEBUG("factory_smoke_reader_t::read_node()","pos_off: %s, xy_off: %s, h_off: %d, speed: %d", desc->pos_off.get_str(), desc->xy_off.get_str(), desc->smoke_height, desc->smoke_speed);
 
 	return desc;
 }
@@ -186,7 +186,7 @@ obj_desc_t *factory_smoke_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 
 obj_desc_t *factory_supplier_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 {
-	// DBG_DEBUG("factory_product_reader_t::read_node()", "called");
+	// DBG_DEBUG("factory_supplier_reader_t::read_node()", "called");
 	ALLOCA(char, desc_buf, node.size);
 
 	factory_supplier_desc_t *desc = new factory_supplier_desc_t();
@@ -213,7 +213,7 @@ obj_desc_t *factory_supplier_reader_t::read_node(FILE *fp, obj_node_info_t &node
 		desc->consumption = decode_uint16(p);
 	}
 	
-	DBG_DEBUG("factory_product_reader_t::read_node()", "version=%d, capacity=%d, count=%d, consumption=%d",
+	DBG_DEBUG("factory_supplier_reader_t::read_node()", "version=%d, capacity=%d, count=%d, consumption=%d",
 		0,
 		desc->capacity,
 		desc->supplier_count,
