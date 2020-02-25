@@ -101,6 +101,7 @@ private:
 	koord xy_off;
 	sint16 smoke_speed;
 	sint16 smoke_height;
+	sint16 smoke_life;
 
 public:
 	const char *get_name() const { return get_images()->get_name(); }
@@ -132,6 +133,9 @@ public:
 
 	// speed of smoke movement (upwards)
 	sint16 get_smoke_speed() const { return smoke_speed; }
+
+	// smoke lifetime (ticks / ms ?)
+	sint16 get_smoke_life() const { return smoke_life; }
 
 };
 

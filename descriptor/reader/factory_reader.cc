@@ -172,13 +172,26 @@ obj_desc_t *factory_smoke_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 	y = decode_sint16(p);
 	desc->xy_off = koord( x, y );
 
-	x = decode_sint16(p);
-	desc->smoke_speed = x;
+	// Vladki: old versions of PAK files have no version stamp.
+	// But we know, the speed was always positive and ignored in old versions.
+	// Version are encoded as negative numbers, absolute value is used.
+	const sint16 v = decode_sint16(p);
+	const sint16 version = v < 0 ? abs(v) : 0;
 
-	y = decode_sint16(p);
-	desc->smoke_height = y;
+	if(version == 1) {
+		// first version of smoke_improvements
+		desc->smoke_speed = decode_sint16(p);
+		desc->smoke_height = decode_sint16(p);
+		desc->smoke_life = decode_sint16(p);
+	}
+	else {
+		// no version, set defaults
+		desc->smoke_speed = 1;
+		desc->smoke_height = 8;
+		desc->smoke_life = 2500;
+	}
 
-	DBG_DEBUG("factory_smoke_reader_t::read_node()","pos_off: %s, xy_off: %s, h_off: %d, speed: %d", desc->pos_off.get_str(), desc->xy_off.get_str(), desc->smoke_height, desc->smoke_speed);
+	DBG_DEBUG("factory_smoke_reader_t::read_node()","version: %d, pos_off: %s, xy_off: %s, h_off: %d, speed: %d, life %d", version, desc->pos_off.get_str(), desc->xy_off.get_str(), desc->smoke_height, desc->smoke_speed, desc->smoke_life);
 
 	return desc;
 }

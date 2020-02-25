@@ -45,6 +45,7 @@ class strasse_t;
 // Height offset for vehicle smoke (may be configurable in the future)
 #define SMOKE_HEIGHT 8
 #define SMOKE_SPEED  1
+#define SMOKE_LIFE 2500
 
 /*----------------------- Movables ------------------------------------*/
 

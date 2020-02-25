@@ -7,11 +7,9 @@
 #include "../display/simimg.h"
 
 // speed of wind affecting smoke
-#define WIND_SPEED 0
+//#define WIND_SPEED 0
 //#define WIND_SPEED 1
-//#define WIND_SPEED sim_async_rand(2)
-// smoke lifetime
-#define SMOKE_LIFE 2500
+#define WIND_SPEED sim_async_rand(2)
 
 class karte_t;
 
@@ -24,9 +22,10 @@ class wolke_t : public obj_no_info_t, public sync_steppable
 private:
 	static vector_tpl<const skin_desc_t *>all_clouds;
 
-	uint16 purchase_time;	// clouds vanish when purchase_time>2500 => maximum 5 images ...
+	uint16 purchase_time;	// clouds vanish when purchase_time>smoke_life, originally 2500 => maximum 5 images ...
 	sint16 smoke_height;
 	sint16 smoke_speed;
+	sint16 smoke_life;
 	sint8 base_y_off;
 	uint8 cloud_nr;
 
@@ -34,7 +33,7 @@ public:
 	static bool register_desc(const skin_desc_t *desc);
 
 	wolke_t(loadsave_t *file);
-	wolke_t(koord3d pos, sint8 xoff, sint8 yoff, sint16 hoff, sint16 speed, const skin_desc_t *cloud );
+	wolke_t(koord3d pos, sint8 xoff, sint8 yoff, sint16 hoff, sint16 speed, sint16 life, const skin_desc_t *cloud );
 	virtual ~wolke_t();
 
 	sync_result sync_step(uint32 delta_t);
