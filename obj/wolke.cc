@@ -44,9 +44,9 @@ wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, sint16 h_off, sint16 spe
 	smoke_height = h_off;
 	smoke_speed = speed;
 	smoke_life = life;
-	base_y_off = clamp( (sint16)y_off - smoke_height, -128, 127 );
+	base_y_off = y_off;
 	set_xoff( x_off );
-	set_yoff( base_y_off );
+	set_yoff( clamp( y_off - h_off, -128, 127 ));
 	purchase_time = 0;
 }
 
@@ -116,7 +116,7 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 	const image_id new_img = get_image();
 
 	// move cloud up
-	const sint8 new_yoff = clamp( base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * smoke_speed) >> 12), -128, 127 );
+	const sint8 new_yoff = clamp( base_y_off - smoke_height - ((purchase_time * OBJECT_OFFSET_STEPS * smoke_speed) >> 12), -128, 127 );
 	if (new_yoff != get_yoff() || new_img != old_img) {
 		// move cloud randomly sideways - be consistent with airplanes - wind blows from NE (right)
 		const sint8 new_xoff = get_xoff() - smoke_speed * WIND_SPEED;
@@ -138,12 +138,18 @@ sync_result wolke_t::sync_step(uint32 delta_t)
 // called during map rotation
 void wolke_t::rotate90()
 {
-	// restore pure yoff
-	set_yoff( base_y_off + smoke_height );
-	obj_t::rotate90();
+	// most basic: rotate coordinate
+	koord3d new_pos = get_pos();
+	new_pos.rotate90( welt->get_size().y-1 );
+	set_pos(new_pos);
+
+	// rotate the base offset
+	sint8 new_xoff = -2 * base_y_off;
+	base_y_off = get_xoff()/2;
+	set_xoff(new_xoff);
+
 	// .. and recalc height offsets
-	base_y_off = clamp( (sint16)get_yoff() - smoke_height, -128, 127 );
-	set_yoff( clamp( base_y_off - ((purchase_time * OBJECT_OFFSET_STEPS * smoke_speed) >> 12), -128, 127 ));
+	set_yoff( clamp( base_y_off - smoke_height - ((purchase_time * OBJECT_OFFSET_STEPS * smoke_speed) >> 12), -128, 127 ));
 }
 
 /***************************** just for compatibility, the old raucher and smoke clouds *********************************/
