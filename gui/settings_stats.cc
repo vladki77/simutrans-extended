@@ -241,6 +241,7 @@ void settings_extended_general_stats_t::init( settings_t *sets )
 	INIT_NUM("max_diversion_tiles", sets->get_max_diversion_tiles(), 0, 65535, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM("way_degradation_fraction", sets->get_way_degradation_fraction(), 0, 40, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM("sighting_distance_meters", sets->get_sighting_distance_meters(), 0, 7500, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM("tilting_min_radius_effect", sets->get_tilting_min_radius_effect(), 0, 10000, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM("assumed_curve_radius_45_degrees", sets->get_assumed_curve_radius_45_degrees(), 0, 10000, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM("max_speed_drive_by_sight_kmh", sets->get_max_speed_drive_by_sight_kmh(), 0, 1000, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM("time_interval_seconds_to_clear", sets->get_time_interval_seconds_to_clear(), 0, 10000, gui_numberinput_t::AUTOLINEAR, false );
@@ -348,7 +349,7 @@ void settings_extended_general_stats_t::read(settings_t *sets)
 	READ_NUM( sets->set_congestion_density_factor );
 	READ_BOOL( sets->set_quick_city_growth );
 	READ_BOOL( sets->set_assume_everywhere_connected_by_road );
-	READ_NUM( sets->set_max_route_tiles_to_process_in_a_step ); 
+	READ_NUM( sets->set_max_route_tiles_to_process_in_a_step );
 	READ_BOOL_VALUE(sets->toll_free_public_roads);
 	READ_NUM( sets->set_spacing_shift_mode );
 	READ_NUM( sets->set_spacing_shift_divisor);
@@ -361,6 +362,7 @@ void settings_extended_general_stats_t::read(settings_t *sets)
 	READ_NUM_VALUE( sets->way_degradation_fraction );
 	READ_NUM_VALUE( sets->sighting_distance_meters );
 	sets->sighting_distance_tiles = sets->sighting_distance_meters / sets->meters_per_tile;
+	READ_NUM_VALUE( sets->tilting_min_radius_effect );
 	READ_NUM_VALUE( sets->assumed_curve_radius_45_degrees );
 	READ_NUM_VALUE( sets->max_speed_drive_by_sight_kmh );
 	sets->max_speed_drive_by_sight = kmh_to_speed(sets->max_speed_drive_by_sight_kmh);
@@ -457,12 +459,12 @@ void settings_extended_revenue_stats_t::init( settings_t *sets )
 		set_cell_component(tbl, new_textarea(scr_coord(2, 0), translator::translate("waiting\ntolerance\nmax. min")), 5, 0);
 		row++;
 		set_cell_component(tbl, new_label(scr_coord(2, 3), "commuting"), 0, row);
-		set_cell_component(tbl, new_numinp(scr_coord(0, 3), sets->get_min_commuting_tolerance() / 10, 2, 9600, 1), 4, row);
-		set_cell_component(tbl, new_numinp(scr_coord(0, 3), sets->get_range_commuting_tolerance() / 10, 2, 9600, 1), 5, row);
+		set_cell_component(tbl, new_numinp(scr_coord(0, 3), sets->get_min_commuting_tolerance() / 10, 2, 21600, 1), 4, row);
+		set_cell_component(tbl, new_numinp(scr_coord(0, 3), sets->get_range_commuting_tolerance() / 10, 2, 21600, 1), 5, row);
 		row++;
 		set_cell_component(tbl, new_label(scr_coord(2, 0), "visiting"), 0, row);
-		set_cell_component(tbl, new_numinp(scr_coord(0, 0), sets->get_min_visiting_tolerance() / 10, 2, 9600, 1), 4, row);
-		set_cell_component(tbl, new_numinp(scr_coord(0, 0), sets->get_range_visiting_tolerance() / 10, 2, 9600, 1), 5, row);
+		set_cell_component(tbl, new_numinp(scr_coord(0, 0), sets->get_min_visiting_tolerance() / 10, 2, 21600, 1), 4, row);
+		set_cell_component(tbl, new_numinp(scr_coord(0, 0), sets->get_range_visiting_tolerance() / 10, 2, 21600, 1), 5, row);
 		INIT_TABLE_END(tbl);
 	}
 	SEPERATOR;
@@ -555,6 +557,8 @@ void settings_extended_revenue_stats_t::init( settings_t *sets )
 void settings_extended_revenue_stats_t::read(settings_t *sets)
 {
 	READ_INIT
+	(void)booliter;
+
 	READ_NUM_VALUE( sets->passenger_trips_per_month_hundredths );
 	READ_NUM_VALUE( sets->mail_packets_per_month_hundredths );
 	READ_NUM_VALUE( sets->passenger_routing_packet_size );
@@ -691,7 +695,7 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	// comboboxes for Extended savegame version and revision
 	savegame_ex.set_pos( scr_coord(2,ypos-2) );
 	savegame_ex.set_size( scr_size(70,D_BUTTON_HEIGHT) );
-	for(  int i=0;  i<lengthof(version_ex);  i++  )
+	for(  uint32 i=0;  i<lengthof(version_ex);  i++  )
 	{
 		if(i == 0)
 		{
@@ -718,7 +722,7 @@ void settings_general_stats_t::init(settings_t const* const sets)
 
 	savegame_ex_rev.set_pos( scr_coord(2,ypos-2) );
 	savegame_ex_rev.set_size( scr_size(70,D_BUTTON_HEIGHT) );
-	for(  int i=0;  i<lengthof(revision_ex);  i++  )
+	for(  uint32 i=0;  i<lengthof(revision_ex);  i++  )
 	{
 		if(i == 0)
 		{
@@ -786,12 +790,12 @@ void settings_general_stats_t::read(settings_t* const sets)
 	sets->calc_job_replenishment_ticks();
 
 	const int selected_ex = savegame_ex.get_selection();
-	if (0 <= selected_ex  &&  selected_ex < lengthof(version_ex)) {
+	if (selected_ex >= 0 &&  selected_ex < (sint32)lengthof(version_ex)) {
 		env_t::savegame_ex_version_str = version_ex[ selected_ex ];
 	}
 
 	const int selected_ex_rev = savegame_ex_rev.get_selection();
-	if (0 <= selected_ex  &&  selected_ex < lengthof(revision_ex)) {
+	if (selected_ex_rev >= 0 &&  selected_ex_rev < (sint32)lengthof(revision_ex)) {
 		env_t::savegame_ex_revision_str = revision_ex[ selected_ex_rev ];
 	}
 }
@@ -883,7 +887,7 @@ void settings_routing_stats_t::init(settings_t const* const sets)
 void settings_routing_stats_t::read(settings_t* const sets)
 {
 	READ_INIT
-	const uint32 old_route_steps = sets->max_route_steps;
+	const sint32 old_route_steps = sets->max_route_steps;
 	// routing of goods
 	READ_BOOL_VALUE( sets->separate_halt_capacities );
 	READ_BOOL_VALUE( sets->avoid_overcrowding );
@@ -1097,17 +1101,17 @@ void settings_climates_stats_t::init(settings_t* const sets)
 	INIT_INIT
 	INIT_NUM_NEW( "height_map_conversion_version", env_t::pak_height_conversion_factor, 1, 2, 0, false );
 	SEPERATOR
-	INIT_NUM_NEW( "Water level", sets->get_groundwater(), -10, 0, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM_NEW( "Water level", sets->get_groundwater(), -20*(ground_desc_t::double_grounds?2:1), 20, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "Mountain height", mountain_height_start, 0, min(1000,100*(11-mountain_roughness_start)), 10, false );
 	INIT_NUM_NEW( "Map roughness", mountain_roughness_start, 0, min(10, 11-((mountain_height_start+99)/100)), gui_numberinput_t::AUTOLINEAR, false );
 	SEPERATOR
 	INIT_LB( "Summer snowline" );
-	INIT_NUM( "Winter snowline", sets->get_winter_snowline(), sets->get_groundwater(), 24, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "Winter snowline", sets->get_winter_snowline(), sets->get_groundwater(), 127, gui_numberinput_t::AUTOLINEAR, false );
 	SEPERATOR
 	// other climate borders ...
 	sint16 arctic = 0;
 	for(  int i=desert_climate;  i!=arctic_climate;  i++  ) {
-		INIT_NUM( ground_desc_t::get_climate_name_from_bit((climate)i), sets->get_climate_borders()[i], sets->get_groundwater(), 24, gui_numberinput_t::AUTOLINEAR, false );
+		INIT_NUM( ground_desc_t::get_climate_name_from_bit((climate)i), sets->get_climate_borders()[i], sets->get_groundwater(), 127, gui_numberinput_t::AUTOLINEAR, false );
 		if(sets->get_climate_borders()[i+1]>arctic) {
 			arctic = sets->get_climate_borders()[i+1];
 		}

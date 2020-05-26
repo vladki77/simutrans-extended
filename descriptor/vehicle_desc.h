@@ -62,9 +62,9 @@ public:
 	 * Engine type
 	 * @author Hj. Malthaner
 	 */
-	enum engine_t {
-		 unknown=-1,
-		steam=0,
+	enum engine_t : uint8 {
+		unknown = 0xFF,
+		steam = 0,
 		diesel,
 		electric,
 		bio,
@@ -138,7 +138,7 @@ private:
 	uint8 trailer_count;			// all defined trailer
 	uint8 upgrades;					// The number of vehicles that are upgrades of this vehicle.
 
-	uint8 engine_type;				// diesel, steam, electric (requires electrified ways), fuel_cell, etc.
+	engine_t engine_type;			// diesel, steam, electric (requires electrified ways), fuel_cell, etc.
 
 	uint8 freight_image_type;		// number of freight images (displayed for different goods)
 	uint8 livery_image_type;		// Number of different liveries (@author: jamespetts, April 2011)
@@ -263,8 +263,8 @@ public:
 		sound = -1;
 		wtyp = wtype;
 		axle_load = al;
-		weight = weight;
-		engine_type = (uint8)engine;
+		this->weight = weight;
+		engine_type = engine;
 		topspeed = speed;
 		mixed_load_prohibition = false;
 		is_tilting = false;
@@ -719,7 +719,7 @@ public:
 
 	uint16 get_range() const { return range; }
 
-	// returns bit flags of bidirectional and has power for drawing formation picture
+	// returns bit flags of bidirectional and has power (v14.8 - Jan, 2020 @Ranran)
 	uint8 get_interactivity() const;
 
 	/**
@@ -782,12 +782,17 @@ public:
 	* eletric engines require an electrified way to run
 	* @author Hj. Malthaner
 	*/
-	uint16 get_engine_type() const { return engine_type; }
+	engine_t get_engine_type() const { return engine_type; }
 
 	/* @return the vehicles length in 1/8 of the normal len
 	* @author prissi
 	*/
 	uint8 get_length() const { return len; }
+
+	/* Calculate the length of a group of vehicles considered as one group by the auto connect function.
+	 * Use the function of convoy_t for removal. Feb, 2020 @Ranran */
+	uint8 calc_auto_connection_length(bool rear_side) const;
+	uint8 get_auto_connection_vehicle_count(bool rear_side) const;
 
 	uint32 get_length_in_steps() const { return get_length() * VEHICLE_STEPS_PER_CARUNIT; }
 
