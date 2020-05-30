@@ -290,33 +290,37 @@ sint32 convoy_t::calc_min_braking_distance(const settings_t &settings, const wei
 }
 
 
-uint32 convoy_t::calc_acceleration(const weight_summary_t &weight, sint32 speed)
+float32e8_t convoy_t::calc_acceleration_info(sint32 weight, float32e8_t speed)  // speed in m/s; accel in m/s/s
 {
-	return ((get_force_summary(speed * kmh2ms) - calc_speed_holding_force(speed * kmh2ms, get_adverse_summary().fr))/g_accel).to_sint32() * 1000 / 28.35 / weight.weight * 100;
+	return ((get_force_summary(speed) - calc_speed_holding_force(speed, weight * g_accel * get_adverse_summary().fr)) / weight);
 }
 
-double convoy_t::calc_acceleration_time(const weight_summary_t &weight, sint32 speed)
+float32e8_t convoy_t::calc_acceleration_time(sint32 weight, sint32 speed)
 {
-	if (!weight.weight || !speed) { return 0.0; }
-	double total_sec = 0;
-	for (int i = 1; i < speed; i++) {
-		if (!calc_acceleration(weight, i)) { return 0.0; /* given speed error */ }
-		const double delta_t = (double)100.0 / calc_acceleration(weight, i);
+	if (weight == 0 || speed == 0) { return float32e8_t::zero; }
+	const float32e8_t speedms = speed * kmh2ms;
+	float32e8_t total_sec = float32e8_t::zero;
+	for (sint32 i = 1; i < speedms; i++) {
+		float32e8_t accel = calc_acceleration_info(weight, i);
+		if (accel.is_zero()) { return float32e8_t::zero; /* given speed error */ }
+		float32e8_t delta_t = 1 / accel;
 		total_sec += delta_t;
 	}
 	return total_sec;
 }
 
-uint32 convoy_t::calc_acceleration_distance(const weight_summary_t &weight, sint32 speed)
+float32e8_t convoy_t::calc_acceleration_distance(sint32 weight, sint32 speed)
 {
-	if (!weight.weight || !speed) { return 0.0; }
-	uint64 travel_distance = 0;
-	for (int i = 1; i < speed; i++) {
-		if (!calc_acceleration(weight, i)) { return 0; /* given speed error */ }
-		const double delta_t = (double)100.0 / calc_acceleration(weight, i);
-		travel_distance += delta_t * (i - 0.5) * 1000 / 3600 * 100; // [cm]
+	if (weight == 0 || speed == 0) { return float32e8_t::zero; }
+	const float32e8_t speedms = speed * kmh2ms;
+	float32e8_t travel_distance = float32e8_t::zero;
+	for (sint32 i = 1; i < speedms; i++) {
+		float32e8_t accel = calc_acceleration_info(weight, i);
+		if (accel.is_zero()) { return float32e8_t::zero; /* given speed error */ }
+		float32e8_t delta_t = 1 / accel;
+		travel_distance += delta_t * i; // [m]
 	}
-	return travel_distance/100; // in meter
+	return travel_distance; // in meters
 }
 
 inline float32e8_t _calc_move(const float32e8_t &a, const float32e8_t &t, const float32e8_t &v0)

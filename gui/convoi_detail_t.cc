@@ -359,11 +359,11 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 
 			// starting acceleration
 			lazy_convoy_t &convoy = *cnv.get_rep();
-			const sint32 friction = convoy.get_current_friction();
-			const uint32 starting_acceleration = convoy.calc_acceleration(weight_summary_t(cnv->get_weight_summary().weight, friction), 0);
-			const uint32 starting_acceleration_min = convoy.calc_acceleration(weight_summary_t(cnv->get_sum_weight(), friction), 0);
+			//const sint32 friction = convoy.get_current_friction();
+			const float32e8_t starting_acceleration = convoy.calc_acceleration_info(cnv->get_weight_summary().weight, 0) * ms2kmh;
+			const float32e8_t starting_acceleration_min = convoy.calc_acceleration_info(cnv->get_vehicle_summary().weight, 0) * ms2kmh;
 			buf.clear();
-			buf.printf("%s %.2f km/h/s (%.2f km/h/s)", translator::translate("Starting acceleration:"), (double)starting_acceleration / 100.0, (double)starting_acceleration_min / 100.0);
+			buf.printf("%s %.2f km/h/s (%.2f km/h/s)", translator::translate("Starting acceleration:"), starting_acceleration.to_double(), starting_acceleration_min.to_double());
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
