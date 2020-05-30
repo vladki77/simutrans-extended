@@ -724,7 +724,7 @@ public:
 
 	uint16 get_range() const { return range; }
 
-	// returns bit flags of bidirectional and has power (v14.8 - Jan, 2020 @Ranran)
+	// returns bit flags of bidirectional and has power for drawing formation picture
 	uint8 get_interactivity() const;
 
 	/**
