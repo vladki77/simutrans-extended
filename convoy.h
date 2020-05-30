@@ -341,7 +341,8 @@ public:
 
 	// acceleration
 	// starting acceleration sets speed to 0
-	float32e8_t calc_acceleration_info(sint32 weight, float32e8_t speed);  // speed in m/s; accel in m/s/s
+	float32e8_t calc_acceleration_ms(sint32 weight, float32e8_t speed);  // speed in m/s; accel in m/s/s
+	float32e8_t calc_acceleration_kmh(sint32 weight, sint32 speed);  // speed in km/h; accel in km/h/s
 	float32e8_t calc_acceleration_time(sint32 weight, sint32 speed);  // speed in km/h; time in s
 	float32e8_t calc_acceleration_distance(sint32 weight, sint32 speed); // speed in km/h; distance in m
 

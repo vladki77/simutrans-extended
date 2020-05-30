@@ -290,9 +290,15 @@ sint32 convoy_t::calc_min_braking_distance(const settings_t &settings, const wei
 }
 
 
-float32e8_t convoy_t::calc_acceleration_info(sint32 weight, float32e8_t speed)  // speed in m/s; accel in m/s/s
+float32e8_t convoy_t::calc_acceleration_ms(sint32 weight, float32e8_t speed)  // speed in m/s; accel in m/s/s
 {
 	return ((get_force_summary(speed) - calc_speed_holding_force(speed, weight * g_accel * get_adverse_summary().fr)) / weight);
+}
+
+float32e8_t convoy_t::calc_acceleration_kmh(sint32 weight, sint32 speed)  // speed in km/h; accel in km/h/s
+{
+	const float32e8_t speedms = speed * kmh2ms;
+    return calc_acceleration_ms(weight, speedms) * ms2kmh;
 }
 
 float32e8_t convoy_t::calc_acceleration_time(sint32 weight, sint32 speed)
@@ -301,8 +307,8 @@ float32e8_t convoy_t::calc_acceleration_time(sint32 weight, sint32 speed)
 	const float32e8_t speedms = speed * kmh2ms;
 	float32e8_t total_sec = float32e8_t::zero;
 	for (sint32 i = 1; i < speedms; i++) {
-		float32e8_t accel = calc_acceleration_info(weight, i);
-		if (accel.is_zero()) { return float32e8_t::zero; /* given speed error */ }
+		float32e8_t accel = calc_acceleration_ms(weight, i);
+		if (accel.is_zero()) { return float32e8_t::zero; /* given speed unreachable */ }
 		float32e8_t delta_t = 1 / accel;
 		total_sec += delta_t;
 	}
@@ -315,8 +321,8 @@ float32e8_t convoy_t::calc_acceleration_distance(sint32 weight, sint32 speed)
 	const float32e8_t speedms = speed * kmh2ms;
 	float32e8_t travel_distance = float32e8_t::zero;
 	for (sint32 i = 1; i < speedms; i++) {
-		float32e8_t accel = calc_acceleration_info(weight, i);
-		if (accel.is_zero()) { return float32e8_t::zero; /* given speed error */ }
+		float32e8_t accel = calc_acceleration_ms(weight, i);
+		if (accel.is_zero()) { return float32e8_t::zero; /* given speed unreachable */ }
 		float32e8_t delta_t = 1 / accel;
 		travel_distance += delta_t * i; // [m]
 	}
