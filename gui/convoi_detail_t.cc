@@ -337,10 +337,11 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 		}
 
 		// display total values
-		if (vehicle_count > 1) {
+		if (vehicle_count > 0) {
 			// vehicle min max. speed (not consider weight)
 			buf.clear();
-			buf.printf("%s %3d km/h\n", translator::translate("Max. speed:"), speed_to_kmh(cnv->get_min_top_speed()));
+			buf.printf(translator::translate("Speed: "));
+			buf.printf(translator::translate("%i km/h (max. %ikm/h)"), speed_to_kmh(cnv->get_akt_speed()), speed_to_kmh(cnv->get_min_top_speed()));
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
@@ -348,6 +349,7 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			buf.clear();
 			// NOTE: These value needs to be modified because these are multiplied by "gear"
 			buf.printf(translator::translate("%s %4d kW, %d kN"), translator::translate("Power:"), cnv->get_sum_power() / 1000, cnv->get_starting_force().to_sint32() / 1000);
+			//buf.printf(" (Current: %4d kW, %d kN)\n", cnv->get_power_summary(cnv->get_akt_speed()), cnv->get_force_summary(cnv->get_akt_speed())); // these are protected ;-(
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
@@ -357,20 +359,34 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
+			const sint32 empty_weight = cnv->get_vehicle_summary().weight;
+			const sint32 gross_weight = cnv->get_weight_summary().weight;
+
 			// starting acceleration
 			//lazy_convoy_t &convoy = *cnv.get_rep();
 			//const sint32 friction = convoy.get_current_friction();
-			const float32e8_t starting_acceleration = cnv->calc_acceleration_kmh(cnv->get_weight_summary().weight, 0);
-			const float32e8_t starting_acceleration_min = cnv->calc_acceleration_kmh(cnv->get_vehicle_summary().weight, 0);
-			const float32e8_t starting_acceleration_mss = cnv->calc_acceleration_ms(cnv->get_vehicle_summary().weight, 0);
+			const float32e8_t starting_acceleration = cnv->calc_acceleration_kmh(gross_weight, 0);
+			const float32e8_t starting_acceleration_max = cnv->calc_acceleration_kmh(empty_weight, 0);
+			const float32e8_t starting_acceleration_mss = cnv->calc_acceleration_ms(empty_weight, 0);
 			buf.clear();
-			buf.printf("%s %.2f km/h/s (%.2f km/h/s = %.2f m/s/s)", translator::translate("Starting acceleration:"), starting_acceleration.to_double(), starting_acceleration_min.to_double(), starting_acceleration_mss.to_double());
+			buf.printf("%s %.2f km/h/s (max: %.2f km/h/s = %.2f m/s/s)", translator::translate("Starting acceleration:"), starting_acceleration.to_double(), starting_acceleration_max.to_double(), starting_acceleration_mss.to_double());
+			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
+			total_height += LINESPACE;
+
+			// brake distance
+			const sint32 brake_distance_akt = cnv->calc_min_braking_distance(cnv->get_weight_summary(), kmh2ms * speed_to_kmh(cnv->get_akt_speed()));
+			const sint32 brake_distance_max = cnv->calc_min_braking_distance(cnv->get_weight_summary(), kmh2ms * speed_to_kmh(cnv->get_min_top_speed()));
+			buf.clear();
+			buf.printf(translator::translate("brakes from max. speed in %i m"), brake_distance_max);
+			buf.printf(" (");
+			buf.printf(translator::translate("from current speed in %i m"), brake_distance_akt);
+			buf.printf(")\n");
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
 			// convoy weight
 			buf.clear();
-			buf.printf("%s %.1ft (%.1ft)", translator::translate("Weight:"), cnv->get_weight_summary().weight / 1000.0, cnv->get_sum_weight() / 1000.0);
+			buf.printf("%s %.1f t (min: %.1f t)", translator::translate("Weight:"), gross_weight / 1000.0, empty_weight / 1000.0);
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
@@ -563,7 +579,7 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			}
 
 			// Friction
-			if (v->get_frictionfactor() != 1)
+			if (v->get_frictionfactor() != 0)
 			{
 				buf.clear();
 				buf.printf("%s %i", translator::translate("Friction:"), v->get_frictionfactor());
