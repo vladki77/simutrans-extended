@@ -422,25 +422,25 @@ bool player_t::new_month()
 				}
 				else if(ss == player_t::in_administration)
 				{
-					buf.printf(translator::translate("in_administration_warning"));
+					buf.printf("%s", translator::translate("in_administration_warning"));
 					buf.printf("\n\n");
-					buf.printf(translator::translate("administration_duration"));
+					buf.printf("%s", translator::translate("administration_duration"));
 					buf.printf(" %i ", finance->get_number_of_months_insolvent());
 					buf.printf(translator::translate("months")); 
 					warning_message_type = message_t::problems;
 				}
 				else if (ss == player_t::in_liquidation)
 				{
-					buf.printf(translator::translate("in_liquidation_warning"));
+					buf.printf("%s", translator::translate("in_liquidation_warning"));
 					buf.printf("\n\n");
-					buf.printf(translator::translate("liquidation_duration_remaining"));
+					buf.printf("%s", translator::translate("liquidation_duration_remaining"));
 					buf.printf(" %i ", 24 - finance->get_number_of_months_insolvent());
-					buf.printf(translator::translate("months")); 
+					buf.printf("%s", translator::translate("months"));
 					warning_message_type = message_t::problems;
 				}
 				else if(  account_balance < finance->get_soft_credit_limit()  )
 				{
-					buf.printf( translator::translate("\n\nYou have exceeded your credit limit!") );
+					buf.printf("%s", translator::translate("\n\nYou have exceeded your credit limit!") );
 					// This is a more serious problem than the interest
 					warning_message_type = message_t::problems;
 				}
@@ -459,11 +459,11 @@ bool player_t::new_month()
 		enum message_t::msg_typ warning_message_type = message_t::ai;
 		buf.printf(get_name());
 		buf.printf(" ");
-		buf.printf(translator::translate("other_player_in_administration"));
+		buf.printf("%s", translator::translate("other_player_in_administration"));
 		buf.printf(" \n\n");
-		buf.printf(translator::translate("other_player_administration_duration"));
+		buf.printf("%s", translator::translate("other_player_administration_duration"));
 		buf.printf(" %i ", finance->get_number_of_months_insolvent());
-		buf.printf(translator::translate("months"));
+		buf.printf("%s", translator::translate("months"));
 		welt->get_message()->add_message(buf, koord::invalid, warning_message_type, player_nr, IMG_EMPTY);
 	}
 	else if (ss == player_t::in_liquidation)
@@ -472,15 +472,15 @@ bool player_t::new_month()
 		enum message_t::msg_typ warning_message_type = message_t::ai;
 		buf.printf(get_name());
 		buf.printf(" ");
-		buf.printf(translator::translate("other_player_in_liquidation"));
+		buf.printf("%s", translator::translate("other_player_in_liquidation"));
 		buf.printf(" \n\n");
-		buf.printf(translator::translate("other_player_liquidation_duration"));
+		buf.printf("%s", translator::translate("other_player_liquidation_duration"));
 		buf.printf(" %i ", finance->get_number_of_months_insolvent() - 12);
-		buf.printf(translator::translate("months"));
+		buf.printf("%s", translator::translate("months"));
 		welt->get_message()->add_message(buf, koord::invalid, warning_message_type, player_nr, IMG_EMPTY);
 
 		// If the company has been in liquidation for too long, fully liquidate it.
-		if (false && finance->get_number_of_months_insolvent() >= 24)
+		if (finance->get_number_of_months_insolvent() >= 24)
 		{
 			// Ready to liquidate fully.
 			complete_liquidation();
@@ -1325,7 +1325,7 @@ void player_t::take_over(player_t* target_player)
 							char param[256];
 							uint16 mask = sign->get_player_mask();
 							const uint8 player_number_target = target_player->get_player_nr();
-							if (1 << player_number_target & mask)
+							if ((1 << player_number_target & mask) || obj->get_owner() == target_player)
 							{
 								const uint8 player_number_this = get_player_nr();
 								mask ^= 1 << player_number_this;
@@ -1352,12 +1352,11 @@ void player_t::take_over(player_t* target_player)
 					}
 					if (obj->get_owner() == target_player)
 					{
+						depot_t* dep = NULL;
 						switch (obj->get_typ())
 						{
-						case obj_t::roadsign:
-							
 						// Fallthrough intended
-						case obj_t::signal:
+						
 						case obj_t::airdepot:
 						case obj_t::bahndepot:
 						case obj_t::monoraildepot:
@@ -1365,6 +1364,19 @@ void player_t::take_over(player_t* target_player)
 						case obj_t::strassendepot:
 						case obj_t::narrowgaugedepot:
 						case obj_t::schiffdepot:
+
+							// Transfer vehicles in a depot not in a convoy, then fall through
+							dep = (depot_t*)obj;
+							FOR(slist_tpl<vehicle_t*>, vehicle, dep->get_vehicle_list())
+							{
+								if (vehicle->get_owner() == target_player)
+								{
+									vehicle->set_owner(this);
+								}
+							}
+
+						case obj_t::roadsign:
+						case obj_t::signal:
 						case obj_t::senke:
 						case obj_t::pumpe:
 						case obj_t::wayobj:
@@ -1447,7 +1459,7 @@ void player_t::take_over(player_t* target_player)
 			}
 		}
 	}
-
+	
 	calc_assets();
 
 	// After recalculating the assets, recalculate the credit limits
