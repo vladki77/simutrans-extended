@@ -341,10 +341,10 @@ public:
 
 	// acceleration
 	// starting acceleration sets speed to 0
-	float32e8_t calc_acceleration_ms(sint32 weight, float32e8_t speed);  // speed in m/s; accel in m/s/s
-	float32e8_t calc_acceleration_kmh(sint32 weight, sint32 speed);  // speed in km/h; accel in km/h/s
-	float32e8_t calc_acceleration_time(sint32 weight, sint32 speed);  // speed in km/h; time in s
-	float32e8_t calc_acceleration_distance(sint32 weight, sint32 speed); // speed in km/h; distance in m
+	float32e8_t calc_acceleration_ms(const weight_summary_t &weight, float32e8_t speed);  // speed in m/s; accel in m/s/s
+	float32e8_t calc_acceleration_kmh(const weight_summary_t &weight, sint32 speed);  // speed in km/h; accel in km/h/s
+	float32e8_t calc_acceleration_time(const weight_summary_t &weight, sint32 speed);  // speed in km/h; time in s
+	float32e8_t calc_acceleration_distance(const weight_summary_t &weight, sint32 speed); // speed in km/h; distance in m
 
 	/**
 	 * Calculate the movement within delta_t

@@ -160,7 +160,8 @@ void weight_summary_t::add_weight(sint32 kgs, sint32 sin_alpha)
 {
 	weight += kgs;
 	// sin_alpha <-- v.get_frictionfactor() between about -14 (downhill) and 50 (uphill).
-	// Including the factor 1000 for tons to kg conversion, 50 corresponds to an inclination of 28 per mille.
+	// Including the factor 1000 for tons to kg conversion, 50 corresponds to an inclination of 50 per mille (2.8 degrees).
+	// For small angles sin_alpha ~ tan_alpha ~ alpha (in radians). Inclination = tan_alpha. Error is less than 1% up to tan_alpha = 176.
 	// sin_alpha == 1000 would be 90 degrees == vertically up, -1000 vertically down.
 	if (sin_alpha != 0)
 	{
@@ -290,20 +291,20 @@ sint32 convoy_t::calc_min_braking_distance(const settings_t &settings, const wei
 }
 
 
-float32e8_t convoy_t::calc_acceleration_ms(sint32 weight, float32e8_t speed)  // speed in m/s; accel in m/s/s
+float32e8_t convoy_t::calc_acceleration_ms(const weight_summary_t &weight, float32e8_t speed)  // speed in m/s; accel in m/s/s
 {
-	return ((get_force_summary(speed) - calc_speed_holding_force(speed, weight * g_accel * get_adverse_summary().fr)) / weight);
+	return ((get_force_summary(speed) - calc_speed_holding_force(speed, g_accel * (adverse.fr * weight.weight_cos + weight.weight_sin))) / weight.weight);
 }
 
-float32e8_t convoy_t::calc_acceleration_kmh(sint32 weight, sint32 speed)  // speed in km/h; accel in km/h/s
+float32e8_t convoy_t::calc_acceleration_kmh(const weight_summary_t &weight, sint32 speed)  // speed in km/h; accel in km/h/s
 {
 	const float32e8_t speedms = speed * kmh2ms;
     return calc_acceleration_ms(weight, speedms) * ms2kmh;
 }
 
-float32e8_t convoy_t::calc_acceleration_time(sint32 weight, sint32 speed)
+float32e8_t convoy_t::calc_acceleration_time(const weight_summary_t &weight, sint32 speed)
 {
-	if (weight == 0 || speed == 0) { return float32e8_t::zero; }
+	if (weight.weight == 0 || speed == 0) { return float32e8_t::zero; }
 	const float32e8_t speedms = speed * kmh2ms;
 	float32e8_t total_sec = float32e8_t::zero;
 	for (sint32 i = 1; i < speedms; i++) {
@@ -315,9 +316,9 @@ float32e8_t convoy_t::calc_acceleration_time(sint32 weight, sint32 speed)
 	return total_sec;
 }
 
-float32e8_t convoy_t::calc_acceleration_distance(sint32 weight, sint32 speed)
+float32e8_t convoy_t::calc_acceleration_distance(const weight_summary_t &weight, sint32 speed)
 {
-	if (weight == 0 || speed == 0) { return float32e8_t::zero; }
+	if (weight.weight == 0 || speed == 0) { return float32e8_t::zero; }
 	const float32e8_t speedms = speed * kmh2ms;
 	float32e8_t travel_distance = float32e8_t::zero;
 	for (sint32 i = 1; i < speedms; i++) {
