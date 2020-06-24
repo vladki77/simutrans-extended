@@ -290,43 +290,35 @@ sint32 convoy_t::calc_min_braking_distance(const settings_t &settings, const wei
 	return settings.meters_to_steps(x);
 }
 
-
-float32e8_t convoy_t::calc_acceleration_ms(const weight_summary_t &weight, float32e8_t speed)  // speed in m/s; accel in m/s/s
+float32e8_t convoy_t::calc_acceleration_ms(const weight_summary_t &weight, float32e8_t speed)
 {
 	return ((get_force_summary(speed) - calc_speed_holding_force(speed, g_accel * (adverse.fr * weight.weight_cos + weight.weight_sin))) / weight.weight);
 }
 
-float32e8_t convoy_t::calc_acceleration_kmh(const weight_summary_t &weight, sint32 speed)  // speed in km/h; accel in km/h/s
+float32e8_t convoy_t::calc_acceleration_kmh(const weight_summary_t &weight, sint32 speed)
 {
 	const float32e8_t speedms = speed * kmh2ms;
     return calc_acceleration_ms(weight, speedms) * ms2kmh;
 }
 
-float32e8_t convoy_t::calc_acceleration_time(const weight_summary_t &weight, sint32 speed)
+void convoy_t::calc_acceleration_info(const weight_summary_t &weight, sint32 speed, float32e8_t &travel_distance, float32e8_t &total_sec, float32e8_t &start_accel)
 {
-	if (weight.weight == 0 || speed == 0) { return float32e8_t::zero; }
-	float32e8_t total_sec = float32e8_t::zero;
+	total_sec = float32e8_t::zero;
+	travel_distance = float32e8_t::zero;
+	start_accel = float32e8_t::zero;
+	if (weight.weight == 0 || speed == 0) { return; }
 	for (sint32 i = 0; i < speed; i++) {
 		float32e8_t accel = calc_acceleration_kmh(weight, i);
-		if (accel.is_zero()) { return float32e8_t::zero; /* given speed unreachable */ }
+		if (accel.is_zero()) { return; /* given speed unreachable */ }
+		if (i == 0) { start_accel = accel; }
 		float32e8_t delta_t = 1 / accel;
 		total_sec += delta_t;
+		travel_distance += delta_t * kmh2ms * (i + delta_t * accel / 2);
+		// Physics: delta_s = speed * delta_t + accel / 2 * delta_t ^ 2
 	}
-	return total_sec;
+	return;
 }
 
-float32e8_t convoy_t::calc_acceleration_distance(const weight_summary_t &weight, sint32 speed)
-{
-	if (weight.weight == 0 || speed == 0) { return float32e8_t::zero; }
-	float32e8_t travel_distance = float32e8_t::zero;
-	for (sint32 i = 0; i < speed; i++) {
-		float32e8_t accel = calc_acceleration_kmh(weight, i);
-		if (accel.is_zero()) { return float32e8_t::zero; /* given speed unreachable */ }
-		float32e8_t delta_t = 1 / accel;
-		travel_distance += delta_t * kmh2ms * (i + delta_t * accel / 2); // [m]
-	}
-	return travel_distance; // in meters
-}
 
 inline float32e8_t _calc_move(const float32e8_t &a, const float32e8_t &t, const float32e8_t &v0)
 {
