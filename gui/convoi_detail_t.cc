@@ -357,7 +357,6 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			buf.clear();
 			// NOTE: These value needs to be modified because these are multiplied by "gear"
 			buf.printf(translator::translate("%s %4d kW, %d kN"), translator::translate("Power:"), cnv->get_sum_power() / 1000, cnv->get_starting_force().to_sint32() / 1000);
-			//buf.printf(" (Current: %4d kW, %d kN)\n", cnv->get_power_summary(cnv->get_akt_speed()), cnv->get_force_summary(cnv->get_akt_speed())); // these are protected ;-(
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
@@ -371,8 +370,6 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			const weight_summary_t gross_weight = cnv->get_weight_summary();
 
 			// starting acceleration
-			//lazy_convoy_t &convoy = *cnv.get_rep();
-			//const sint32 friction = convoy.get_current_friction();
 			const float32e8_t starting_acceleration = cnv->calc_acceleration_ms(gross_weight, 0);
 			const float32e8_t starting_acceleration_max = cnv->calc_acceleration_ms(weight_summary_t(empty_weight.weight, cnv->get_current_friction()), 0);
 			const float32e8_t current_acceleration = cnv->calc_acceleration_ms(gross_weight, cur_speed * kmh2ms);
