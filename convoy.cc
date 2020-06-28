@@ -160,9 +160,10 @@ void weight_summary_t::add_weight(sint32 kgs, sint32 sin_alpha)
 {
 	weight += kgs;
 	// sin_alpha <-- v.get_frictionfactor() between about -14 (downhill) and 50 (uphill).
-	// Including the factor 1000 for tons to kg conversion, 50 corresponds to an inclination of 50 per mille (2.8 degrees).
-	// For small angles sin_alpha ~ tan_alpha ~ alpha (in radians). Inclination = tan_alpha. Error is less than 1% up to tan_alpha = 176.
+	// Including the factor 1000 for tons to kg conversion, 50 corresponds to an inclination of 2.8 degrees.
 	// sin_alpha == 1000 would be 90 degrees == vertically up, -1000 vertically down.
+	// For small angles sin_alpha ~ tan_alpha ~ alpha (in radians). Inclination = tan_alpha.
+	// If alpha = 0.2 rad (11.46 deg), then sin_alpha = 199, tan_alpha = 203, cos_alpha = 980
 	if (sin_alpha != 0)
 	{
 		weight_sin += (kgs * sin_alpha + 500) / 1000;
@@ -182,7 +183,7 @@ void weight_summary_t::add_weight(sint32 kgs, sint32 sin_alpha)
 void weight_summary_t::add_vehicle(const vehicle_t &v)
 {
 	// v.get_frictionfactor() between about -14 (downhill) and 50 (uphill).
-	// Including the factor 1000 for tons to kg conversion, 50 corresponds to an inclination of 28 per mille.
+	// Including the factor 1000 for tons to kg conversion, 50 corresponds to an inclination of 2.8 degrees.
 	add_weight(v.get_total_weight(), v.get_frictionfactor());
 }
 
