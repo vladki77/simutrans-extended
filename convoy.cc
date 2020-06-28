@@ -314,8 +314,10 @@ void convoy_t::calc_acceleration_info(const weight_summary_t &weight, sint32 spe
 		if (i == 0) { start_accel = accel; }
 		float32e8_t delta_t = 1 / accel;
 		total_sec += delta_t;
-		travel_distance += delta_t * kmh2ms * (i + delta_t * accel / 2);
-		// Physics: delta_s = speed * delta_t + accel / 2 * delta_t ^ 2
+		travel_distance += delta_t * kmh2ms * (i + float32e8_t::half);
+		// Physics: delta_s = delta_t * speed + delta_t^2 * accel/2
+		// ........ delta_s = delta_t * (speed + delta_t * accel/2 )   ... but delta_t = 1 / accel
+		// ........ delta_s = delta_t * (speed + 1/2)
 	}
 	return;
 }
