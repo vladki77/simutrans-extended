@@ -339,19 +339,18 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 		// display total values
 		if (vehicle_count > 0) {
 			// vehicle min max. speed (not consider weight)
-			const sint32 cur_speed = speed_to_kmh(cnv->get_akt_speed());
+			//const sint32 cur_speed = speed_to_kmh(cnv->get_akt_speed());
 			const sint32 max_speed = speed_to_kmh(cnv->get_min_top_speed());
-			const sint32 allowed_speed = min(speed_to_kmh(cnv->get_akt_speed_soll()), cnv->get_adverse_summary().max_speed);
+			//const sint32 allowed_speed = min(speed_to_kmh(cnv->get_akt_speed_soll()), cnv->get_adverse_summary().max_speed);
 			buf.clear();
-			buf.printf(translator::translate("Speed: "));
-			buf.printf(translator::translate("%i km/h (max. %ikm/h)"), cur_speed, max_speed);
+			buf.printf(translator::translate("%s %i km/h\n"), translator::translate("Max. speed:"), max_speed);
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
-			buf.clear();
-			buf.printf(translator::translate("Allowed speed: "));
-			buf.printf(translator::translate("%i km/h"), allowed_speed);
-			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
-			total_height += LINESPACE;
+			//buf.clear();
+			//buf.printf(translator::translate("Allowed speed: "));
+			//buf.printf(translator::translate("%i km/h"), allowed_speed);
+			//display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
+			//total_height += LINESPACE;
 
 			// convoy power
 			buf.clear();
@@ -372,40 +371,36 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			// starting acceleration
 			const float32e8_t starting_acceleration = cnv->calc_acceleration_ms(gross_weight, 0);
 			const float32e8_t starting_acceleration_max = cnv->calc_acceleration_ms(weight_summary_t(empty_weight.weight, cnv->get_current_friction()), 0);
-			const float32e8_t current_acceleration = cnv->calc_acceleration_ms(gross_weight, cur_speed * kmh2ms);
+			//const float32e8_t current_acceleration = cnv->calc_acceleration_ms(gross_weight, cur_speed * kmh2ms);
+			//buf.clear();
+			//buf.printf("%s %.2f km/h/s = %.2f m/s/s", translator::translate("Possible acceleration:"), (current_acceleration * ms2kmh).to_double(), current_acceleration.to_double());
+			//display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
+			//total_height += LINESPACE;
 			buf.clear();
-			buf.printf("%s %.2f km/h/s = %.2f m/s/s", translator::translate("Possible acceleration:"), (current_acceleration * ms2kmh).to_double(), current_acceleration.to_double());
-			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
-			total_height += LINESPACE;
-			buf.clear();
-			buf.printf("%s %.2f km/h/s = %.2f m/s/s", translator::translate("Starting acceleration:"), (starting_acceleration * ms2kmh).to_double(), starting_acceleration.to_double());
-			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
-			total_height += LINESPACE;
-			buf.clear();
-			buf.printf("%s %.2f km/h/s = %.2f m/s/s (empty)", translator::translate("Starting acceleration:"), (starting_acceleration_max * ms2kmh).to_double(), starting_acceleration_max.to_double());
+			buf.printf("%s %.2f km/h/s (%.2f km/h/s)", translator::translate("Starting acceleration:"), (starting_acceleration * ms2kmh).to_double(), (starting_acceleration_max * ms2kmh).to_double());
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
 			// brake distance
-			const sint32 brake_distance_cur = cnv->calc_min_braking_distance(gross_weight, kmh2ms * cur_speed);
+			//const sint32 brake_distance_cur = cnv->calc_min_braking_distance(gross_weight, kmh2ms * cur_speed);
 			const sint32 brake_distance_max = cnv->calc_min_braking_distance(gross_weight, kmh2ms * max_speed);
-			const sint32 brake_distance_allowed = cnv->calc_min_braking_distance(gross_weight, kmh2ms * allowed_speed);
+			//const sint32 brake_distance_allowed = cnv->calc_min_braking_distance(gross_weight, kmh2ms * allowed_speed);
 			buf.clear();
-			buf.printf(translator::translate("brakes from %i km/h in %i m"), max_speed, brake_distance_max);
+			buf.printf(translator::translate("brakes from max. speed in %i m"), brake_distance_max);
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
-			buf.clear();
-			buf.printf(translator::translate("brakes from %i km/h in %i m"), allowed_speed, brake_distance_allowed);
-			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
-			total_height += LINESPACE;
-			buf.clear();
-			buf.printf(translator::translate("brakes from %i km/h in %i m"), cur_speed, brake_distance_cur);
-			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
-			total_height += LINESPACE;
+			//buf.clear();
+			//buf.printf(translator::translate("brakes from %i km/h in %i m"), allowed_speed, brake_distance_allowed);
+			//display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
+			//total_height += LINESPACE;
+			//buf.clear();
+			//buf.printf(translator::translate("brakes from %i km/h in %i m"), cur_speed, brake_distance_cur);
+			//display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
+			//total_height += LINESPACE;
 
 			// convoy weight
 			buf.clear();
-			buf.printf("%s %.1f t (min: %.1f t)", translator::translate("Weight:"), gross_weight.weight / 1000.0, empty_weight.weight / 1000.0);
+			buf.printf("%s %.1ft (%.1ft)", translator::translate("Weight:"), gross_weight.weight / 1000.0, empty_weight.weight / 1000.0);
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 
