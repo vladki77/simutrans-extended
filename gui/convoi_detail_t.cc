@@ -343,7 +343,7 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			const sint32 max_speed = speed_to_kmh(cnv->get_min_top_speed());
 			//const sint32 allowed_speed = min(speed_to_kmh(cnv->get_akt_speed_soll()), cnv->get_adverse_summary().max_speed);
 			buf.clear();
-			buf.printf(translator::translate("%s %i km/h\n"), translator::translate("Max. speed:"), max_speed);
+			buf.printf("%s %i km/h\n", translator::translate("Max. speed:"), max_speed);
 			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
 			total_height += LINESPACE;
 			//buf.clear();
