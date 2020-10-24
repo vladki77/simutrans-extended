@@ -233,7 +233,7 @@ public:
 	 * this will only return something if this stop belongs to same player or is public, or is a dock (when on water)
 	 */
 	static halthandle_t get_halt(const koord3d pos, const player_t *player );
-	static halthandle_t get_halt(const koord pos, const player_t *player );
+	static halthandle_t get_halt_2D(const koord pos, const player_t *player );
 
 //	static slist_tpl<halthandle_t>& get_alle_haltestellen() { return alle_haltestellen; }
 	static const vector_tpl<halthandle_t>& get_alle_haltestellen() { return alle_haltestellen; }
@@ -714,6 +714,10 @@ public:
 	 * @author Hj. Malthaner
 	 */
 	uint32 get_ware_summe(const goods_desc_t *warentyp) const;
+	uint32 get_ware_summe(const goods_desc_t *warentyp, uint8 g_class) const;
+
+	uint32 get_leaving_goods_sum(const goods_desc_t *warentyp, uint8 g_class = 255) const;
+	uint32 get_transferring_goods_sum(const goods_desc_t *warentyp, uint8 g_class = 255) const;
 
 	/**
 	 * returns total number for a certain position (since more than one factory might connect to a stop)

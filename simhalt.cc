@@ -25,7 +25,7 @@
 #include "gui/simwin.h"
 #include "simworld.h"
 #include "simware.h"
-#include "simsys.h"
+#include "sys/simsys.h"
 
 #include "bauer/hausbauer.h"
 #include "bauer/goods_manager.h"
@@ -98,7 +98,48 @@ void haltestelle_t::step_all()
 }
 
 
-halthandle_t haltestelle_t::get_halt(const koord pos, const player_t *player )
+static vector_tpl<convoihandle_t>stale_convois;
+static vector_tpl<linehandle_t>stale_lines;
+
+
+void haltestelle_t::start_load_game()
+{
+	all_koords = new inthashtable_tpl<sint32,halthandle_t>;
+}
+
+
+void haltestelle_t::end_load_game()
+{
+	delete all_koords;
+	all_koords = NULL;
+}
+
+/**
+ * return an index to a halt; it is only used for old games
+ * by default create a new halt if none found
+ */
+halthandle_t haltestelle_t::get_halt_koord_index(koord k)
+{
+	if(!welt->is_within_limits(k)) {
+		return halthandle_t();
+	}
+	// check in hashtable
+	halthandle_t h;
+	const sint32 n = get_halt_key(koord3d(k,-128), welt->get_size().y);
+	assert(all_koords);
+	h = all_koords->get( n );
+
+	if(  !h.is_bound()  ) {
+		// No halts found => create one
+		h = haltestelle_t::create(k, NULL );
+		all_koords->set( n,  h );
+	}
+	return h;
+}
+
+
+
+halthandle_t haltestelle_t::get_halt_2D(const koord pos, const player_t *player )
 {
 	const planquadrat_t *plan = welt->access(pos);
 	if(plan)
@@ -146,46 +187,6 @@ halthandle_t haltestelle_t::get_halt(const koord pos, const player_t *player )
 	}
 	return halthandle_t();
 }
-
-static vector_tpl<convoihandle_t>stale_convois;
-static vector_tpl<linehandle_t>stale_lines;
-
-
-void haltestelle_t::start_load_game()
-{
-	all_koords = new inthashtable_tpl<sint32,halthandle_t>;
-}
-
-
-void haltestelle_t::end_load_game()
-{
-	delete all_koords;
-	all_koords = NULL;
-}
-
-/**
- * return an index to a halt; it is only used for old games
- * by default create a new halt if none found
- */
-halthandle_t haltestelle_t::get_halt_koord_index(koord k)
-{
-	if(!welt->is_within_limits(k)) {
-		return halthandle_t();
-	}
-	// check in hashtable
-	halthandle_t h;
-	const sint32 n = get_halt_key(koord3d(k,-128), welt->get_size().y);
-	assert(all_koords);
-	h = all_koords->get( n );
-
-	if(  !h.is_bound()  ) {
-		// No halts found => create one
-		h = haltestelle_t::create(k, NULL );
-		all_koords->set( n,  h );
-	}
-	return h;
-}
-
 
 /* we allow only for a single stop per grund
  * this will only return something if this stop is accessible by the player passed in the second parameter
@@ -703,7 +704,13 @@ void haltestelle_t::rotate90( const sint16 y_size )
 		}
 	}
 
-	for (uint32 i = 0; i < world()->get_parallel_operations(); i++)
+#ifdef MULTI_THREAD
+	const sint32 po = world()->get_parallel_operations() + 2;
+#else
+	const sint32 po = 1;
+#endif
+
+	for (uint32 i = 0; i < po; i++)
 	{
 		vector_tpl<transferring_cargo_t>& tcarray = transferring_cargoes[i];
 		for (size_t j = tcarray.get_count(); j-- > 0;)
@@ -1189,10 +1196,10 @@ void haltestelle_t::request_loading(convoihandle_t cnv)
 		{
 			convoihandle_t const c = *i;
 			if (c.is_bound()
-				&& (c->get_state() == convoi_t::LOADING || c->get_state() == convoi_t::REVERSING || c->get_state() == convoi_t::WAITING_FOR_CLEARANCE)
+				&& (c->is_loading() || c->get_state() == convoi_t::REVERSING || c->get_state() == convoi_t::WAITING_FOR_CLEARANCE)
 				&& ((get_halt(c->get_pos(), owner) == self)
 					|| (c->get_vehicle(0)->get_waytype() == water_wt
-					&& c->get_state() == convoi_t::LOADING
+					&& c->is_loading()
 					&& get_halt(c->get_schedule()->get_current_entry().pos, owner) == self)))
 			{
 				++i;
@@ -1835,7 +1842,12 @@ uint32 haltestelle_t::get_service_frequency(halthandle_t destination, uint8 cate
 		return service_frequencies.get(spec);
 	}
 
-	dbg->message("uint32 haltestelle_t::get_service_frequency(halthandle_t destination, uint8 category) const", "Service frequency not in the database: calculating");
+	if(destination.is_bound()) {
+		dbg->message("uint32 haltestelle_t::get_service_frequency(halthandle_t destination, uint8 category) const", "Unknown frequency for %s from %s to %s", translator::translate(goods_manager_t::get_info_catg_index(category)->get_catg_name()), get_name(), destination->get_name());
+	} else {
+		dbg->warning("uint32 haltestelle_t::get_service_frequency(halthandle_t destination, uint8 category) const", "Tried to calculate frequency for %s from %s to missing halt", translator::translate(goods_manager_t::get_info_catg_index(category)->get_catg_name()), get_name());
+	}
+
 	return calc_service_frequency(destination, category);
 }
 
@@ -1853,22 +1865,22 @@ uint32 haltestelle_t::calc_service_frequency(halthandle_t destination, uint8 cat
 		uint32 timing = 0;
 		bool line_serves_destination = false;
 		uint32 number_of_calls_at_this_stop = 0;
-		koord current_halt;
-		koord next_halt;
+		koord3d current_halt_pos;
+		koord3d next_halt_pos;
 		for (uint8 n = 0; n < schedule_count; n++)
 		{
-			current_halt = registered_lines[i]->get_schedule()->entries[n].pos.get_2d();
+			current_halt_pos = registered_lines[i]->get_schedule()->entries[n].pos;
 			if (n < schedule_count - 2)
 			{
-				next_halt = registered_lines[i]->get_schedule()->entries[n + 1].pos.get_2d();
+				next_halt_pos = registered_lines[i]->get_schedule()->entries[n + 1].pos;
 			}
 			else
 			{
-				next_halt = registered_lines[i]->get_schedule()->entries[0].pos.get_2d();
+				next_halt_pos = registered_lines[i]->get_schedule()->entries[0].pos;
 			}
 			if (n < schedule_count - 1)
 			{
-				const uint32 average_time = registered_lines[i]->get_average_journey_times().get(id_pair(haltestelle_t::get_halt(current_halt, owner).get_id(), haltestelle_t::get_halt(next_halt, owner).get_id())).get_average();
+				const uint32 average_time = registered_lines[i]->get_average_journey_times().get(id_pair(haltestelle_t::get_halt(current_halt_pos, owner).get_id(), haltestelle_t::get_halt(next_halt_pos, owner).get_id())).get_average();
 				if (average_time != 0 && average_time != UINT32_MAX_VALUE)
 				{
 					timing += average_time;
@@ -1876,7 +1888,7 @@ uint32 haltestelle_t::calc_service_frequency(halthandle_t destination, uint8 cat
 				else
 				{
 					// Fallback to convoy's general average speed if a point-to-point average is not available.
-					const uint32 distance = shortest_distance(current_halt, next_halt);
+					const uint32 distance = shortest_distance(current_halt_pos.get_2d(), next_halt_pos.get_2d());
 					const uint32 recorded_average_speed = registered_lines[i]->get_finance_history(1, LINE_AVERAGE_SPEED);
 					const uint32 average_speed = recorded_average_speed > 0 ? recorded_average_speed : speed_to_kmh(registered_lines[i]->get_convoy(0)->get_min_top_speed()) >> 1;
 					const uint32 journey_time = welt->travel_time_tenths_from_distance(distance, average_speed);
@@ -1885,7 +1897,7 @@ uint32 haltestelle_t::calc_service_frequency(halthandle_t destination, uint8 cat
 				}
 			}
 
-			halthandle_t current_halthandle = haltestelle_t::get_halt(current_halt, owner);
+			halthandle_t current_halthandle = haltestelle_t::get_halt(current_halt_pos, owner);
 
 			if (current_halthandle == destination)
 			{
@@ -2472,7 +2484,7 @@ bool haltestelle_t::fetch_goods(slist_tpl<ware_t> &load, const goods_desc_t *goo
 					sint64 this_arrival_time = check_arrivals.get(cnv->self.get_id());
 					if (this_arrival_time == 0)
 					{
-						dbg->error("bool haltestelle_t::fetch_goods()", "A convoy's arrival time is not in the database");
+						dbg->message("bool haltestelle_t::fetch_goods()", "Unknown arrival time for %s at %s", cnv->get_name(), get_name());
 						this_arrival_time = welt->get_ticks();
 
 						// Fall back to convoy's general average speed if a point-to-point average is not available.
@@ -2810,6 +2822,75 @@ uint32 haltestelle_t::get_ware_summe(const goods_desc_t *wtyp) const
 	return sum;
 }
 
+uint32 haltestelle_t::get_ware_summe(const goods_desc_t *wtyp, uint8 g_class) const
+{
+	if (g_class >= wtyp->get_number_of_classes()) {
+		return 0;
+	}
+	int sum = 0;
+	const vector_tpl<ware_t> * warray = cargo[wtyp->get_catg_index()];
+	if (warray != NULL) {
+		FOR(vector_tpl<ware_t>, const& i, *warray) {
+			if (wtyp->get_index() == i.get_index() && g_class == i.get_class()) {
+				sum += i.menge;
+			}
+		}
+	}
+	return sum;
+}
+
+uint32 haltestelle_t::get_transferring_goods_sum(const goods_desc_t *wtyp, uint8 g_class) const
+{
+	if (g_class != 255 && g_class >= wtyp->get_number_of_classes()) {
+		return 0;
+	}
+	int sum = 0;
+	ware_t ware;
+
+#ifdef MULTI_THREAD
+	sint32 po = world()->get_parallel_operations();
+#else
+	sint32 po = 1;
+#endif
+	for (sint32 i = 0; i < po; i++)
+	{
+		FOR(vector_tpl<transferring_cargo_t>, tc, transferring_cargoes[i])
+		{
+			ware = tc.ware;
+			if (wtyp->get_index() == ware.get_index() && (g_class == 255 || g_class == ware.get_class())) {
+				sum += ware.menge;
+			}
+		}
+	}
+	return sum;
+}
+
+// transferring goods which leaving from the station
+uint32 haltestelle_t::get_leaving_goods_sum(const goods_desc_t *wtyp, uint8 g_class) const
+{
+	if (g_class != 255 && g_class >= wtyp->get_number_of_classes()) {
+		return 0;
+	}
+	int sum = 0;
+	ware_t ware;
+
+#ifdef MULTI_THREAD
+	sint32 po = world()->get_parallel_operations();
+#else
+	sint32 po = 1;
+#endif
+	for (sint32 i = 0; i < po; i++)
+	{
+		FOR(vector_tpl<transferring_cargo_t>, tc, transferring_cargoes[i])
+		{
+			ware = tc.ware;
+			if (wtyp->get_index() == ware.get_index() && (g_class == 255 || g_class == ware.get_class()) && ware.get_zwischenziel() == self) {
+				sum += ware.menge;
+			}
+		}
+	}
+	return sum;
+}
 
 
 uint32 haltestelle_t::get_ware_fuer_zielpos(const goods_desc_t *wtyp, const koord zielpos) const
@@ -3043,11 +3124,13 @@ void haltestelle_t::liefere_an(ware_t ware, uint8 walked_between_stations)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		dbg->warning("haltestelle_t::liefere_an()","%d %s delivered to %s has walked between too many consecutive stops: terminating early to avoid infinite loops", ware.menge, translator::translate(ware.get_name()), get_name() );
 #ifdef MULTI_THREAD
 		int error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 		assert(error == 0);
+		(void)error;
 #endif
 		return;
 	}
@@ -3065,11 +3148,13 @@ void haltestelle_t::liefere_an(ware_t ware, uint8 walked_between_stations)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		dbg->warning("haltestelle_t::liefere_an()","%d %s delivered to %s have no longer a route to their destination.", ware.menge, translator::translate(ware.get_name()), get_name() );
 #ifdef MULTI_THREAD
 		mutex_error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		return;
 	}
@@ -3084,6 +3169,7 @@ void haltestelle_t::liefere_an(ware_t ware, uint8 walked_between_stations)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		dbg->warning("haltestelle_t::liefere_an()","%d %s delivered to %s were intended for a building that has been deleted.", ware.menge, translator::translate(ware.get_name()), get_name() );
 #ifdef MULTI_THREAD
@@ -3153,6 +3239,7 @@ void haltestelle_t::liefere_an(ware_t ware, uint8 walked_between_stations)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		DBG_MESSAGE("haltestelle_t::liefere_an()", "%s has discovered that it is quicker to walk to its destination from %s than take its previously planned route.", translator::translate(ware.get_name()), get_name());
 #ifdef MULTI_THREAD
@@ -3186,6 +3273,7 @@ void haltestelle_t::liefere_an(ware_t ware, uint8 walked_between_stations)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		// target halt no longer there => delete and remove from fab in transit
 		fabrik_t::update_transit( ware, false );
@@ -5556,29 +5644,29 @@ int haltestelle_t::get_queue_pos(convoihandle_t cnv) const
 	linehandle_t line = cnv->get_line();
 	int count = 0;
 	const bool is_road_type = cnv->get_vehicle(0)->get_waytype() == road_wt;
-	for(slist_tpl<convoihandle_t>::const_iterator i = loading_here.begin(), end = loading_here.end();  i != end && (*i) != cnv; ++i)
+	FOR(slist_tpl<convoihandle_t>, loading_cnv, loading_here)
 	{
-		if(!(*i).is_bound() || get_halt((*i)->get_pos(), owner) != self)
+		if(!loading_cnv.is_bound() || get_halt(loading_cnv->get_pos(), owner) != self || loading_cnv == cnv)
 		{
 			continue;
 		}
-		const int state = (*i)->get_state();
+		const int state = loading_cnv->get_state();
 		// QUERY: If this stop is the stop at which the reverse_route setting is set/unset, might
-		// ((*i)->get_reverse_schedule() == cnv->get_reverse_schedule())
+		// (loading_cnv->get_reverse_schedule() == cnv->get_reverse_schedule())
 		// give a false negative, therefore incorrectly assigning two vehicles to the same queue position?
 		//
 		// ANSWER: No, as the reverse route is only engaged/disengaged on leaving the stop.
 
-		if((*i)->get_line() == line &&
-			(((*i)->get_schedule()->get_current_stop() == cnv->get_schedule()->get_current_stop()
-			&& ((*i)->get_reverse_schedule() == cnv->get_reverse_schedule())
-			&& (!is_road_type || state == convoi_t::LOADING))
+		if(loading_cnv->get_line() == line &&
+			((loading_cnv->get_schedule()->get_current_stop() == cnv->get_schedule()->get_current_stop()
+			&& (loading_cnv->get_reverse_schedule() == cnv->get_reverse_schedule())
+			&& (!is_road_type || loading_cnv->is_loading()))
 			|| (state == convoi_t::REVERSING
 			&& !is_road_type
 			&& cnv->calc_remaining_loading_time() > 100
-			&& ((*i)->get_reverse_schedule() ?
-				(*i)->get_schedule()->get_current_stop() + 1 == cnv->get_schedule()->get_current_stop() :
-				(*i)->get_schedule()->get_current_stop() - 1 == cnv->get_schedule()->get_current_stop()))))
+			&& (loading_cnv->get_reverse_schedule() ?
+				loading_cnv->get_schedule()->get_current_stop() + 1 == cnv->get_schedule()->get_current_stop() :
+				loading_cnv->get_schedule()->get_current_stop() - 1 == cnv->get_schedule()->get_current_stop()))))
 		{
 			count++;
 		}

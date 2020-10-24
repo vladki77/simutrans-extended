@@ -26,7 +26,7 @@
 #include "../display/viewport.h"
 #include "../simmenu.h"
 #include "../simskin.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simticker.h"
 #include "simwin.h"
 #include "../simintr.h"
@@ -1620,7 +1620,14 @@ void win_display_flush(double konto)
 		right_border -= 14;
 		display_color_img( skinverwaltung_t::networksymbol->get_image_id(0), right_border, disp_height-15, 0, false, true );
 		if(  tooltip_check  &&  tooltip_xpos>=right_border  ) {
-			tooltip_text = translator::translate("Connected with server");
+			if (env_t::server)
+			{
+				tooltip_text = translator::translate("Running as a server");
+			}
+			else
+			{
+				tooltip_text = translator::translate("Connected with server");
+			}
 			tooltip_check = false;
 		}
 	}

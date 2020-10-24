@@ -3,13 +3,6 @@
  * (see LICENSE.txt)
  */
 
-#if defined(_M_X64)  ||  defined(__x86_64__)
-#if __GNUC__
-#warning "Simutrans is preferably compiled as 32 bit binary!"
-#endif
-#endif
-
-
 #include <stdio.h>
 #include <string>
 #include <new>
@@ -39,7 +32,7 @@
 #include "simmenu.h"
 #include "siminteraction.h"
 
-#include "simsys.h"
+#include "sys/simsys.h"
 #include "display/simgraph.h"
 #include "simevent.h"
 
@@ -206,7 +199,7 @@ static void show_times(karte_t *welt, main_view_t *view)
 void modal_dialogue( gui_frame_t *gui, ptrdiff_t magic, karte_t *welt, bool (*quit)() )
 {
 	if(  display_get_width()==0  ) {
-		dbg->error( "modal_dialogue()", "called without a display driver => nothing will be shown!" );
+		dbg->error( "modal_dialogue", "called without a display driver => nothing will be shown!" );
 		env_t::quit_simutrans = true;
 		// cannot handle this!
 		return;
@@ -225,11 +218,12 @@ void modal_dialogue( gui_frame_t *gui, ptrdiff_t magic, karte_t *welt, bool (*qu
 		welt->reset_timer();
 
 		uint32 ms_pause = max( 25, 1000/env_t::fps );
-		uint32 last_step = dr_time()+ms_pause;
+		uint32 last_step = dr_time();
 		uint step_count = 5;
+
 		while(  win_is_open(gui)  &&  !env_t::quit_simutrans  &&  !quit()  ) {
 			do {
-				DBG_DEBUG4("zeige_banner", "calling win_poll_event");
+				DBG_DEBUG4("modal_dialogue", "calling win_poll_event");
 				win_poll_event(&ev);
 				// no toolbar events
 				if(  ev.my < env_t::iconsize.h  ) {
@@ -246,20 +240,21 @@ void modal_dialogue( gui_frame_t *gui, ptrdiff_t magic, karte_t *welt, bool (*qu
 						}
 					}
 				}
-				DBG_DEBUG4("zeige_banner", "calling check_pos_win");
+				DBG_DEBUG4("modal_dialogue", "calling check_pos_win");
 				check_pos_win(&ev);
 				if(  ev.ev_class == EVENT_SYSTEM  &&  ev.ev_code == SYSTEM_QUIT  ) {
 					env_t::quit_simutrans = true;
 					break;
 				}
 				dr_sleep(5);
-			} while(  dr_time()<last_step  );
-			DBG_DEBUG4("zeige_banner", "calling welt->sync_step");
-			intr_disable();
+			} while(  dr_time() - last_step < ms_pause );
+
+			DBG_DEBUG4("modal_dialogue", "calling welt->sync_step");
 			welt->sync_step( ms_pause, true, true );
-			intr_enable();
-			DBG_DEBUG4("zeige_banner", "calling welt->step");
+
 			if(  step_count--==0  ) {
+				DBG_DEBUG4("modal_dialogue", "calling welt->step");
+				intr_set_last_time(last_step); // do not call sync_step twice unless step takes too long
 				welt->step();
 				step_count = 5;
 			}
@@ -285,6 +280,7 @@ void modal_dialogue( gui_frame_t *gui, ptrdiff_t magic, karte_t *welt, bool (*qu
 					simgraph_resize( ev.mx, ev.my );
 					dr_prepare_flush();
 					display_fillbox_wh( 0, 0, ev.mx, ev.my, COL_BLACK, true );
+					gui->draw(win_get_pos(gui), gui->get_windowsize());
 					dr_flush();
 				}
 				else if (ev.ev_code == SYSTEM_QUIT) {
@@ -427,7 +423,7 @@ int simu_main(int argc, char** argv)
 		    "  http://forum.simutrans.com"
 			"\n"
 			"  Based on Simutrans 0.84.21.2\n"
-			"  by Hansjörg Malthaner et. al.\n"
+			"  by Hansjï¿½rg Malthaner et. al.\n"
 			"---------------------------------------\n"
 			"command line parameters available: \n"
 			" -addons             loads also addons (with -objects)\n"
@@ -1423,6 +1419,8 @@ DBG_MESSAGE("simmain","demo file not found at %s",buf.get_str() );
 
 	delete eventmanager;
 	eventmanager = 0;
+
+	translator::delete_all_lists();
 
 	network_core_shutdown();
 

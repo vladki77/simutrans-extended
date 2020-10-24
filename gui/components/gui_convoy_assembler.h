@@ -191,16 +191,16 @@ class gui_convoy_assembler_t :
 	gui_image_list_t electrics;
 	gui_image_list_t loks;
 	gui_image_list_t waggons;
-	gui_scrollpane_t scrolly_pas;
-	gui_scrollpane_t scrolly_pas2;
-	gui_scrollpane_t scrolly_electrics;
-	gui_scrollpane_t scrolly_loks;
-	gui_scrollpane_t scrolly_waggons;
 	gui_container_t cont_pas;
 	gui_container_t cont_pas2;
 	gui_container_t cont_electrics;
 	gui_container_t cont_loks;
 	gui_container_t cont_waggons;
+	gui_scrollpane_t scrolly_pas;
+	gui_scrollpane_t scrolly_pas2;
+	gui_scrollpane_t scrolly_electrics;
+	gui_scrollpane_t scrolly_loks;
+	gui_scrollpane_t scrolly_waggons;
 
 	gui_combobox_t vehicle_filter;
 	gui_label_t lb_vehicle_filter;
@@ -223,7 +223,7 @@ class gui_convoy_assembler_t :
 	cbuffer_t tooltip_convoi_brake_distance;
 	cbuffer_t tooltip_convoi_speed;
 	cbuffer_t text_convoi_axle_load;
-	char txt_convoi_count_fluctuation[4];
+	char txt_convoi_count_fluctuation[6];
 
 	KOORD_VAL second_column_x; // x position of the second text column
 

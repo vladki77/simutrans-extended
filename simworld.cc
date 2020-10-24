@@ -34,7 +34,7 @@
 #include "simmesg.h"
 #include "simskin.h"
 #include "simsound.h"
-#include "simsys.h"
+#include "sys/simsys.h"
 #include "simticker.h"
 #include "simunits.h"
 #include "simversion.h"
@@ -365,7 +365,7 @@ void checklist_t::rdwr(memory_rw_t *buffer)
 
 int checklist_t::print(char *buffer, const char *entity) const
 {
-	return sprintf(buffer, "%s=[ss=%u st=%u nfc=%u rand=%u halt=%u line=%u cnvy=%u ssr=%u,%u,%u,%u,%u,%u,%u,%u str=%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u exr=%u,%u,%u,%u,%u,%u,%u,%u sums=%u,%u,%u,%u,%u,%u,%u,%u",
+	return sprintf(buffer, "%s=[ss=%u st=%u nfc=%u rand=%u halt=%u line=%u cnvy=%u\n\tssr=%u,%u,%u,%u,%u,%u,%u,%u\n\tstr=%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n\texr=%u,%u,%u,%u,%u,%u,%u,%u\n\tsums=%u,%u,%u,%u,%u,%u,%u,%u]\n",
 		entity, ss, st, nfc, random_seed, halt_entry, line_entry, convoy_entry,
 		rand[0], rand[1], rand[2], rand[3], rand[4], rand[5], rand[6], rand[7],
 		rand[8], rand[9], rand[10], rand[11], rand[12], rand[13], rand[14], rand[15], rand[16], rand[17], rand[18], rand[19], rand[20], rand[21], rand[22], rand[23],
@@ -440,7 +440,7 @@ sint32 karte_t::perlin_hoehe(settings_t const* const sets, koord k, koord const 
 		case 3: k = koord(size.y-k.y,k.x); break;
 	}
 //    double perlin_noise_2D(double x, double y, double persistence);
-//    return ((int)(perlin_noise_2D(x, y, 0.6)*160.0)) & 0xFFFFFFF0; 
+//    return ((int)(perlin_noise_2D(x, y, 0.6)*160.0)) & 0xFFFFFFF0;
 	k = k + koord(sets->get_origin_x(), sets->get_origin_y());
 	double map_roughness = sets->get_map_roughness();
 	double mountain_height = sets->get_max_mountain_height();
@@ -481,7 +481,7 @@ void karte_t::cleanup_grounds_loop( sint16 x_min, sint16 x_max, sint16 y_min, si
 			planquadrat_t *pl = access_nocheck(x,y);
 			grund_t *gr = pl->get_kartenboden();
 			koord k(x,y);
-			uint8 slope = calc_natural_slope(k);
+			slope_t::type slope = calc_natural_slope(k);
 			sint8 height = min_hgt_nocheck(k);
 			sint8 water_hgt = get_water_hgt_nocheck(k);
 
@@ -491,7 +491,7 @@ void karte_t::cleanup_grounds_loop( sint16 x_min, sint16 x_max, sint16 y_min, si
 				const sint8 disp_hn_ne = max( height + corner_ne(slope), water_hgt );
 				const sint8 disp_hn_nw = max( height + corner_nw(slope), water_hgt );
 				height = water_hgt;
-				slope = (disp_hn_sw - height) + ((disp_hn_se - height) * 3) + ((disp_hn_ne - height) * 9) + ((disp_hn_nw - height) * 27);
+				slope = encode_corners(disp_hn_sw - height, disp_hn_se - height, disp_hn_ne - height, disp_hn_nw - height);
 			}
 
 			gr->set_pos( koord3d( k, height) );
@@ -697,6 +697,7 @@ void karte_t::destroy()
 
 	bool empty_depot_list = depot_t::get_depot_list().empty();
 	assert( empty_depot_list );
+	(void)empty_depot_list;
 
 	DBG_MESSAGE("karte_t::destroy()", "world destroyed");
 
@@ -926,6 +927,7 @@ void karte_t::add_queued_city(stadt_t* city)
 	{
 		int error = pthread_mutex_lock(&karte_t::private_car_route_mutex);
 		assert(error == 0);
+		(void)error;
 	}
 #endif
 	cities_awaiting_private_car_route_check.append_unique(city);
@@ -934,8 +936,9 @@ void karte_t::add_queued_city(stadt_t* city)
 	{
 		int error = pthread_mutex_unlock(&karte_t::private_car_route_mutex);
 		assert(error == 0);
+		(void)error;
 	}
-#endif 
+#endif
 }
 
 void karte_t::distribute_cities(settings_t const * const sets, sint16 old_x, sint16 old_y)
@@ -1650,6 +1653,8 @@ void *check_road_connexions_threaded(void *args)
 		}
 		int error = pthread_mutex_lock(&karte_t::private_car_route_mutex);
 		assert(error == 0);
+		(void)error;
+
 		if (karte_t::cities_to_process > 0 && karte_t::cities_to_process >= thread_number + 1 && route_t::suspend_private_car_routing == false && !world()->cities_awaiting_private_car_route_check.empty())
 		{
 			stadt_t* city;
@@ -1657,6 +1662,7 @@ void *check_road_connexions_threaded(void *args)
 			karte_t::cities_to_process--;
 			int error = pthread_mutex_unlock(&karte_t::private_car_route_mutex);
 			assert(error == 0);
+			(void)error;
 
 			if (!city || world()->get_settings().get_assume_everywhere_connected_by_road())
 			{
@@ -1671,6 +1677,8 @@ void *check_road_connexions_threaded(void *args)
 		{
 			int error = pthread_mutex_unlock(&karte_t::private_car_route_mutex);
 			assert(error == 0);
+			(void)error;
+
 			if (!world()->is_terminating_threads() && route_t::suspend_private_car_routing)
 			{
 				simthread_barrier_wait(&karte_t::private_car_barrier);
@@ -1842,11 +1850,15 @@ void *step_passengers_and_mail_threaded(void* args)
 		simthread_barrier_wait(&step_passengers_and_mail_barrier); // Having three of these is intentional.
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
+
 		karte_t::world->next_step_passenger -= (total_units_passenger * karte_t::world->passenger_step_interval);
 		karte_t::world->next_step_mail -= (total_units_mail * karte_t::world->mail_step_interval);
+
 		mutex_error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 		simthread_barrier_wait(&step_passengers_and_mail_barrier);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 	}
 
 	return args;
@@ -1985,7 +1997,9 @@ void karte_t::suspend_private_car_threads()
 	{
 		return;
 	}
+
 	await_private_car_threads();
+
 	int error = pthread_mutex_lock(&karte_t::private_car_route_mutex);
 	assert(error == 0 || error == EINVAL);
 	route_t::suspend_private_car_routing = true;
@@ -1998,6 +2012,7 @@ void karte_t::suspend_private_car_threads()
 	route_t::suspend_private_car_routing = false;
 	error = pthread_mutex_unlock(&karte_t::private_car_route_mutex);
 	assert(error == 0 || error == EINVAL);
+	(void)error;
 }
 
 void* path_explorer_threaded(void* args)
@@ -2029,6 +2044,8 @@ void karte_t::await_path_explorer()
 		// ensure only one thread reaches the barrier.
 		int error = pthread_mutex_lock(&path_explorer_await_mutex);
 		assert(error == 0);
+		(void)error;
+
 		if (path_explorer_working)
 		{
 			simthread_barrier_wait(&path_explorer_barrier);
@@ -2067,6 +2084,8 @@ void* unreserve_route_threaded(void* args)
 		{
 			int error = pthread_mutex_unlock(&karte_t::unreserve_route_mutex);
 			assert(error == 0);
+			(void)error;
+
 			continue;
 		}
 
@@ -3093,7 +3112,7 @@ karte_t::karte_t() :
 
 	for(int i=0; i<MAX_PLAYER_COUNT ; i++) {
 		players[i] = NULL;
-		MEMZERO(player_password_hash[i]);
+		player_password_hash[i].clear();
 	}
 
 	// no distance to show at first ...
@@ -3583,7 +3602,7 @@ int karte_t::raise_to(sint16 x, sint16 y, sint8 hsw, sint8 hse, sint8 hne, sint8
 	const sint8 disp_hn_se = max( hn_se, water_hgt );
 	const sint8 disp_hn_ne = max( hn_ne, water_hgt );
 	const sint8 disp_hn_nw = max( hn_nw, water_hgt );
-	const uint8 sneu = (disp_hn_sw - disp_hneu) + ((disp_hn_se - disp_hneu) * 3) + ((disp_hn_ne - disp_hneu) * 9) + ((disp_hn_nw - disp_hneu) * 27);
+	const slope_t::type sneu = encode_corners(disp_hn_sw - disp_hneu, disp_hn_se - disp_hneu, disp_hn_ne - disp_hneu, disp_hn_nw - disp_hneu);
 
 	bool ok = (hmaxneu - hneu <= max_hdiff); // may fail on water tiles since lookup_hgt might be modified from previous raise_to calls
 	if (!ok && !gr->is_water()) {
@@ -3592,7 +3611,7 @@ int karte_t::raise_to(sint16 x, sint16 y, sint8 hsw, sint8 hse, sint8 hne, sint8
 	// change height and slope, for water tiles only if they will become land
 	if(  !gr->is_water()  ||  (hmaxneu > water_hgt  ||  (hneu == water_hgt  &&  hmaxneu == water_hgt)  )  ) {
 		gr->set_pos( koord3d( x, y, disp_hneu ) );
-		gr->set_grund_hang( (slope_t::type)sneu );
+		gr->set_grund_hang( sneu );
 		access_nocheck(x,y)->angehoben();
 		set_water_hgt(x, y, groundwater-4);
 	}
@@ -3894,7 +3913,7 @@ int karte_t::lower_to(sint16 x, sint16 y, sint8 hsw, sint8 hse, sint8 hne, sint8
 	const sint8 disp_hn_se = max( hn_se, water_hgt );
 	const sint8 disp_hn_ne = max( hn_ne, water_hgt );
 	const sint8 disp_hn_nw = max( hn_nw, water_hgt );
-	const uint8 sneu = (disp_hn_sw - disp_hneu) + ((disp_hn_se - disp_hneu) * 3) + ((disp_hn_ne - disp_hneu) * 9) + ((disp_hn_nw - disp_hneu) * 27);
+	const slope_t::type sneu = encode_corners(disp_hn_sw - disp_hneu, disp_hn_se - disp_hneu, disp_hn_ne - disp_hneu, disp_hn_nw - disp_hneu);
 
 	// change height and slope for land tiles only
 	if(  !gr->is_water()  ||  (hmaxneu > water_hgt)  ) {
@@ -4474,7 +4493,14 @@ DBG_MESSAGE( "karte_t::rotate90()", "called" );
 	FOR(vector_tpl<halthandle_t>, const s, haltestelle_t::get_alle_haltestellen()) {
 		s->rotate90(cached_size.x);
 	}
-	for (uint32 i = 0; i < get_parallel_operations(); i++)
+
+#ifdef MULTI_THREAD
+	const sint32 po = get_parallel_operations() + 2;
+#else
+	const sint32 po = 1;
+#endif
+
+	for (uint32 i = 0; i < po; i++)
 	{
 		vector_tpl<transferring_cargo_t>& tcarray = transferring_cargoes[i];
 		for (size_t j = tcarray.get_count(); j-- > 0;)
@@ -4816,27 +4842,24 @@ void karte_t::sync_list_t::sync_step(uint32 delta_t)
  */
 void karte_t::sync_step(uint32 delta_t, bool do_sync_step, bool display )
 {
-rands[0] = get_random_seed();
-rands[2] = 0;
-rands[3] = 0;
-rands[4] = 0;
-rands[5] = 0;
-rands[6] = 0;
-rands[7] = 0;
+	rands[0] = get_random_seed();
+	rands[7] = 0;
+
 	// If only one convoy speed is mismatched it should be possible to
 	// identify the convoy involved.
 	debug_sums[0] = 0; // Convoy speeds
 	debug_sums[1] = 0; // Convoy sums multiplied by convoy id
-	debug_sums[2] = 0;
-	debug_sums[3] = 0;
-	debug_sums[4] = 0;
-	debug_sums[5] = 0;
-	debug_sums[6] = 0;
-	debug_sums[7] = 0;
+	debug_sums[2] = 0; // "Einwhoner"
+	debug_sums[3] = 0; // Number of buildings
+	debug_sums[4] = env_t::num_threads; // Number of threads
+	debug_sums[5] = 0; // Passengers/mail generated this step
+	debug_sums[6] = 0; // Transferring cargoes before passenger generation
+	debug_sums[7] = 0; // Transferring cargoes after passenger generation
+
 	set_random_mode( SYNC_STEP_RANDOM );
 	haltestelle_t::pedestrian_limit = 0;
 	if(do_sync_step) {
-		// only omitted, when called to display a new frame during fast forward
+		// Only omitted when called to display a new frame during fast forward
 
 		// just for progress
 		if(  delta_t > 10000  ) {
@@ -4853,16 +4876,22 @@ rands[7] = 0;
 		 */
 		sync_eyecandy.sync_step( delta_t );
 
+		rands[2] = get_random_seed();
+
 		/* pedestrians do not require exact sync and are added/removed frequently
 		 * => they are now in a hastable!
 		 */
 		sync_way_eyecandy.sync_step( delta_t );
 
+		rands[3] = get_random_seed();
+
 		clear_random_mode( INTERACTIVE_RANDOM );
 
 		sync.sync_step( delta_t );
+
+		rands[4] = get_random_seed();
 	}
-rands[1] = get_random_seed();
+	rands[5] = get_random_seed();
 
 	if(display) {
 		// only omitted in fast forward mode for the magic steps
@@ -4893,6 +4922,9 @@ rands[1] = get_random_seed();
 		intr_refresh_display( false );
 		update_frame_sleep_time();
 	}
+
+	rands[6] = get_random_seed();
+
 	clear_random_mode( SYNC_STEP_RANDOM );
 }
 
@@ -5133,21 +5165,31 @@ void karte_t::new_month()
 	// to replace ones that have closed.
 	// @author: jamespetts
 
-	if(industry_density_proportion == 0 && finance_history_month[0][WORLD_CITICENS] > 0)
+	if (settings.get_industry_density_proportion_override() > 0)
 	{
-		// Set the industry density proportion for the first time when the number of citizens is populated.
-		industry_density_proportion = (uint32)((sint64)actual_industry_density * 1000000ll) / finance_history_month[0][WORLD_CITICENS];
+		dbg->message("karte_t::new_month()", "Industry density proportion of %i being overriden with a value of %i", industry_density_proportion, settings.get_industry_density_proportion_override());
+		industry_density_proportion = settings.get_industry_density_proportion_override();
+	}
+	else
+	{
+		if (industry_density_proportion == 0 && finance_history_month[0][WORLD_CITICENS] > 0)
+		{
+			// Set the industry density proportion for the first time when the number of citizens is populated.
+			industry_density_proportion = (uint32)(((sint64)actual_industry_density * 1000000ll) / finance_history_month[0][WORLD_CITICENS]);
+		}
 	}
 	const uint32 target_industry_density = get_target_industry_density();
-	if(actual_industry_density < target_industry_density)
+	uint32 count = 0;
+	while(actual_industry_density < target_industry_density && count < 4)
 	{
-		// Only add one chain per month, and randomise (with a minimum of 8% distribution_weight to ensure that any industry deficiency is, on average, remedied in about a year).
+		// Only add up to four chains per month, and randomise (with a minimum of 8% distribution_weight to ensure that any industry deficiency is, on average, remedied in about a year).
 		const uint32 percentage = max((((target_industry_density - actual_industry_density) * 100u) / target_industry_density), 8u);
 		const uint32 distribution_weight = simrand(100u, "void karte_t::new_month()");
 		if(distribution_weight < percentage)
 		{
 			factory_builder_t::increase_industry_density(true, true);
 		}
+		count++;
 	}
 
 	INT_CHECK("simworld 3105");
@@ -5609,6 +5651,8 @@ void karte_t::step()
 	}
 #endif
 
+	rands[13] = get_random_seed();
+
 	// The more computationally intensive parts of this have been extracted and made multi-threaded.
 	DBG_DEBUG4("karte_t::step 4", "step %d convois", convoi_array.get_count());
 	// since convois will be deleted during stepping, we need to step backwards
@@ -5620,7 +5664,7 @@ void karte_t::step()
 		}
 	}
 
-	rands[13] = get_random_seed();
+	rands[14] = get_random_seed();
 
 	INT_CHECK("karte_t::step 3a");
 
@@ -5639,11 +5683,9 @@ void karte_t::step()
 	FOR(weighted_vector_tpl<stadt_t*>, const i, stadt)
 	{
 		i->step(delta_t);
-		rands[21] += i->get_einwohner();
-		rands[22] += i->get_buildings();
 	}
 
-	rands[14] = get_random_seed();
+	rands[15] = get_random_seed();
 
 	INT_CHECK("karte_t::step 3b");
 
@@ -5654,6 +5696,8 @@ void karte_t::step()
 		await_private_car_threads();
 	}
 #endif
+
+	rands[16] = get_random_seed();
 
 	INT_CHECK("karte_t::step 3c");
 
@@ -5666,6 +5710,13 @@ void karte_t::step()
 	rands[30] = 0;
 	rands[31] = 0;
 	rands[23] = 0;
+
+	sint32 po;
+#ifdef MULTI_THREAD
+	po = get_parallel_operations() + 2;
+#else
+	po = 1;
+#endif
 
 	// This is quite computationally intensive, but not as much as the path explorer. It can be more or less than the convoys, depending on the map.
 	// Multi-threading the passenger and mail generation is currently not working well as dividing the number of passengers/mail to be generated per
@@ -5693,6 +5744,11 @@ void karte_t::step()
 
 		INT_CHECK("karte_t::step 3d");
 
+		for (uint32 i = 0; i < po; i++)
+		{
+			debug_sums[6] += transferring_cargoes[i].get_count();
+		}
+
 		start_passengers_and_mail_threads();
 
 #ifdef FORBID_MULTI_THREAD_PASSENGER_GENERATION_IN_NETWORK_MODE
@@ -5707,7 +5763,7 @@ void karte_t::step()
 #endif
 	DBG_DEBUG4("karte_t::step", "step generate passengers and mail");
 
-	rands[15] = get_random_seed();
+	rands[17] = get_random_seed();
 
 	// the inhabitants stuff
 	finance_history_year[0][WORLD_CITICENS] = finance_history_month[0][WORLD_CITICENS] = 0;
@@ -5726,12 +5782,19 @@ void karte_t::step()
 		finance_history_year[0][WORLD_VISITOR_DEMAND] += city->get_finance_history_year(0, HIST_VISITOR_DEMAND);
 	}
 
-	rands[23] = get_random_seed();
+	rands[18] = get_random_seed();
 
 	INT_CHECK("karte_t::step 4");
 
 	// This does nothing if the threading is disabled.
 	await_passengers_and_mail_threads();
+
+	rands[19] = get_random_seed();
+
+	for (uint32 i = 0; i < po; i++)
+	{
+		debug_sums[7] += transferring_cargoes[i].get_count();
+	}
 
 #ifdef MULTI_THREAD
 	// This is necessary in network mode to ensure that all cars set in motion
@@ -5798,7 +5861,7 @@ void karte_t::step()
 	FOR(vector_tpl<fabrik_t*>, const f, fab_list) {
 		f->step(delta_t);
 	}
-	rands[16] = get_random_seed();
+	rands[20] = get_random_seed();
 
 	finance_history_year[0][WORLD_FACTORIES] = finance_history_month[0][WORLD_FACTORIES] = fab_list.get_count();
 
@@ -5808,7 +5871,7 @@ void karte_t::step()
 	pumpe_t::step_all( delta_t );
 	senke_t::step_all( delta_t );
 	powernet_t::step_all( delta_t );
-	rands[17] = get_random_seed();
+	rands[21] = get_random_seed();
 
 	INT_CHECK("karte_t::step 6");
 
@@ -5820,14 +5883,14 @@ void karte_t::step()
 			players[i]->step();
 		}
 	}
-	rands[18] = get_random_seed();
+	rands[22] = get_random_seed();
 
 	INT_CHECK("karte_t::step 7");
 
 	// This is not computationally intensive
 	DBG_DEBUG4("karte_t::step", "step halts");
 	haltestelle_t::step_all();
-	rands[19] = get_random_seed();
+	rands[23] = get_random_seed();
 
 	// Re-check paths if the time has come.
 	// Long months means that it might be necessary to do
@@ -5835,15 +5898,19 @@ void karte_t::step()
 	// routings for goods/passengers.
 	// Default: 8192 ~ 1h (game time) at 125m/tile.
 
-	// This is not the computationally intensive bit of the path explorer.
+	// This is not the computationally intensive bit of the path explorer. // Loss of synchronisation suspected to be in a block of code starting here.
 	if((steps % get_settings().get_reroute_check_interval_steps()) == 0)
 	{
 		path_explorer_t::refresh_all_categories(false);
 	}
 
+	rands[24] = get_random_seed();
+
 	INT_CHECK("karte_t::step 8");
 
 	check_transferring_cargoes();
+
+	rands[25] = get_random_seed();
 
 #ifdef MULTI_THREAD_PATH_EXPLORER
 	// Start the path explorer ready for the next step. This can be very
@@ -5904,10 +5971,10 @@ void karte_t::step()
 
 	if(  get_scenario()->is_scripted() ) {
 		get_scenario()->step();
-	}
+	} // Loss of synchronisation suspected to be in a block of code ending here.
 
 	DBG_DEBUG4("karte_t::step", "end");
-	rands[20] = get_random_seed();
+	rands[26] = get_random_seed();
 }
 
 void karte_t::step_time_interval_signals()
@@ -6052,9 +6119,9 @@ void karte_t::check_transferring_cargoes()
 	const sint64 current_time = ticks;
 	ware_t ware;
 #ifdef MULTI_THREAD
-	sint32 po = get_parallel_operations();
+	const sint32 po = get_parallel_operations() + 2;
 #else
-	sint32 po = 1;
+	const sint32 po = 1;
 #endif
 	bool removed;
 	for (sint32 i = 0; i < po; i++)
@@ -6163,7 +6230,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 	{
 		// Pick a passenger building at random
 		const uint32 weight = simrand(passenger_origins.get_sum_weight() - 1, "void karte_t::generate_passengers_and_mail(uint32 delta_t) pick origin building (passengers)");
-		gb = passenger_origins.at_weight(weight); 
+		gb = passenger_origins.at_weight(weight);
 	}
 	else
 	{
@@ -6184,11 +6251,14 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 		city->set_generated_passengers(units_this_step, history_type + 1);
+		add_to_debug_sums(5, units_this_step);
 #ifdef MULTI_THREAD
 		mutex_error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 	}
 
@@ -6281,7 +6351,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 				tolerance = simrand_normal(range_commuting_tolerance, settings.get_random_mode_commuting(), "karte_t::generate_passengers_and_mail (commuting tolerance?)") + (min_commuting_tolerance * onward_trips);
 #ifdef DEBUG_MARCHETTI_CONSTANT
 				total_journey_time_tolerance_this_month += tolerance;
-#endif 
+#endif
 			}
 			else
 			{
@@ -6289,7 +6359,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 				const uint32 tolerance_modifier_percentage = settings.get_tolerance_modifier_percentage();
 				// Now multiply the tolerance by the success percentage of the origin building so as to normalise per inhabitant travel time over any given period of time:
 				// passengers who travel more often must have a lower average journey time tolerance than those who travel less often.
-				const uint32 success_percentage = (uint32)gb->get_average_passenger_success_percent_visiting();
+				const uint32 success_percentage = (uint32)gb->get_passenger_success_percent_last_year_visiting();
 				uint32 tolerance_multiplier = tolerance_modifier_percentage;
 				if (success_percentage > 0 && tolerance_modifier_percentage > 0)
 				{
@@ -6328,7 +6398,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 				{
 					passengers_this_month_with_tolerance_of_under_3_hours++;
 				}
-#endif 
+#endif
 			}
 		}
 		else
@@ -6361,11 +6431,13 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 				int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 				assert(mutex_error == 0);
+				(void)mutex_error;
 #endif
 				city->set_generated_passengers(units_this_step, history_type + 1);
 #ifdef MULTI_THREAD
 				mutex_error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 				assert(mutex_error == 0);
+				(void)mutex_error;
 #endif
 			}
 
@@ -6396,8 +6468,8 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 		ware_t pax(wtyp);
 		pax.is_commuting_trip = trip == commuting_trip;
 		start_halt.set_id(0);
-		uint32 best_journey_time;
-		uint32 walking_time;
+		uint32 best_journey_time = UINT32_MAX_VALUE;
+		uint32 walking_time = UINT32_MAX_VALUE;
 		route_status = initialising;
 		pax.g_class = g_class;
 		if (wtyp == goods_manager_t::passengers)
@@ -6413,11 +6485,13 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 			int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 			assert(mutex_error == 0);
+			(void)mutex_error;
 #endif
 			first_origin->add_passengers_generated_commuting(units_this_step);
 #ifdef MULTI_THREAD
 			mutex_error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 			assert(mutex_error == 0);
+			(void)mutex_error;
 #endif
 		}
 
@@ -6426,11 +6500,13 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 			int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 			assert(mutex_error == 0);
+			(void)mutex_error;
 #endif
 			first_origin->add_passengers_generated_visiting(units_this_step);
 #ifdef MULTI_THREAD
 			mutex_error = pthread_mutex_unlock(&karte_t::step_passengers_and_mail_mutex);
 			assert(mutex_error == 0);
+			(void)mutex_error;
 #endif
 		}
 
@@ -6439,6 +6515,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 			int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 			assert(mutex_error == 0);
+			(void)mutex_error;
 #endif
 			first_origin->add_mail_generated(units_this_step);
 #ifdef MULTI_THREAD
@@ -6483,7 +6560,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 			walking_time_preference_threshold = simrand(walking_tolerance > min_commuting_tolerance ? walking_tolerance - min_commuting_tolerance : min_commuting_tolerance, "karte_t::generate_passengers_and_mail (walking walking_time_preference_threshold)") + min_commuting_tolerance;
 		}
 
-		uint32 car_minutes;
+		uint32 car_minutes = UINT32_MAX_VALUE;
 
 		best_bad_destination = first_destination.location;
 		best_bad_start_halt = 0;
@@ -6690,7 +6767,6 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 				// Search for a route using public transport.
 
 				uint32 best_start_halt = 0;
-				uint32 best_non_crowded_start_halt = 0;
 				uint32 best_journey_time_including_crowded_halts = UINT32_MAX_VALUE;
 
 				sint32 i = 0;
@@ -6739,7 +6815,6 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 						if(!current_halt->is_overcrowded(wtyp->get_index()))
 						{
 							best_journey_time = current_journey_time;
-							best_non_crowded_start_halt = i;
 							if(pax.get_ziel().is_bound())
 							{
 								route_status = public_transport;
@@ -6852,6 +6927,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 					int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 					assert(mutex_error == 0);
+					(void)mutex_error;
 #endif
 					dbg->error("simworld.cc", "Incorrect destination type detected");
 #ifdef MULTI_THREAD
@@ -6957,6 +7033,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 #ifdef MULTI_THREAD
 		int mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 		assert(mutex_error == 0);
+		(void)mutex_error;
 #endif
 
 		switch(route_status)
@@ -7002,7 +7079,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 						passengers_travelled_this_month_with_tolerance_of_under_10_minutes++;
 					}
 				}
-#endif 
+#endif
 			}
 			else if(trip == visiting_trip && first_origin)
 			{
@@ -7211,7 +7288,7 @@ sint32 karte_t::generate_passengers_or_mail(const goods_desc_t * wtyp)
 				{
 					city->merke_passagier_ziel(best_bad_destination, COL_PURPLE);
 				}
-				else if(car_minutes < UINT32_MAX_VALUE) 
+				else if(car_minutes < UINT32_MAX_VALUE)
 				{
 					city->merke_passagier_ziel(best_bad_destination, COL_LIGHT_PURPLE);
 				}
@@ -7437,7 +7514,7 @@ no_route:
 								mutex_error = pthread_mutex_lock(&karte_t::step_passengers_and_mail_mutex);
 								assert(mutex_error == 0);
 #endif
-								if (trip == mail_trip) 
+								if (trip == mail_trip)
 								{
 									current_destination.building->get_fabrik()->book_stat(units_this_step, FAB_MAIL_DEPARTED);
 								}
@@ -7972,7 +8049,7 @@ uint8 karte_t::recalc_natural_slope( const koord k, sint8 &new_height ) const
 		const sint16 d2 = min( corner_height[1] - new_height, max_hdiff );
 		const sint16 d3 = min( corner_height[2] - new_height, max_hdiff );
 		const sint16 d4 = min( corner_height[3] - new_height, max_hdiff );
-		return d4 * 27 + d3 * 9 + d2 * 3 + d1;
+		return encode_corners(d1, d2, d3, d4);
 	}
 	return 0;
 }
@@ -7996,7 +8073,7 @@ uint8 karte_t::calc_natural_slope( const koord k ) const
 		const int d3=h3-mini;
 		const int d4=h4-mini;
 
-		return d1 * 27 + d2 * 9 + d3 * 3 + d4;
+		return encode_corners(d4, d3, d2, d1);
 	}
 	return 0;
 }
@@ -8034,7 +8111,7 @@ bool karte_t::square_is_free(koord k, sint16 w, sint16 h, int *last_y, climate_b
 
 			uint8 test_region = get_region(k_check);
 
-			
+
 			if ((1 << test_region & regions_allowed) == 0) //((regions_allowed & (1 << test_region + 1)) == 0)
 			{
 				return false;
@@ -8542,7 +8619,7 @@ DBG_MESSAGE("karte_t::save(loadsave_t *file)", "saved messages");
 		ware_t ware;
 #ifdef MULTI_THREAD
 		count = 0;
-		for (sint32 i = 0; i < get_parallel_operations(); i++)
+		for (sint32 i = 0; i < get_parallel_operations() + 2; i++)
 		{
 			count += transferring_cargoes[i].get_count();
 		}
@@ -8554,7 +8631,7 @@ DBG_MESSAGE("karte_t::save(loadsave_t *file)", "saved messages");
 
 		sint32 po;
 #ifdef MULTI_THREAD
-		po = get_parallel_operations();
+		po = get_parallel_operations() + 2;
 #else
 		po = 1;
 #endif
@@ -8928,9 +9005,41 @@ void karte_t::plans_finish_rd( sint16 x_min, sint16 x_max, sint16 y_min, sint16 
 #endif
 }
 
+void karte_t::clear_checklist_history()
+{
+	// TODO: either explain or remove the use of pre-increment (++i)
+	for(  int i=0;  i<LAST_CHECKLISTS_COUNT;  ++i  ) {
+		last_checklists[i] = checklist_t();
+	}
+}
+
+void karte_t::clear_checklist_rands()
+{
+	for(  int i = 0;  i < CHK_RANDS  ;  i++  ) {
+		rands[i] = 0;
+	}
+}
+
+void karte_t::clear_checklist_debug_sums()
+{
+	for(  int i = 0;  i < CHK_DEBUG_SUMS  ;  i++  ) {
+		debug_sums[i] = 0;
+	}
+}
+
+void karte_t::clear_all_checklists()
+{
+	clear_checklist_history();
+	clear_checklist_rands();
+	clear_checklist_debug_sums();
+}
 
 void karte_t::load(loadsave_t *file)
 {
+	if(  env_t::networkmode  ) {
+		clear_all_checklists();
+	}
+
 	char buf[80];
 
 	intr_disable();
@@ -8974,7 +9083,7 @@ void karte_t::load(loadsave_t *file)
 	file->set_buffered(true);
 
 	// jetzt geht das laden los
-	dbg->warning("karte_t::load", "Fileversion: %d", file->get_version());
+	dbg->warning("karte_t::load", "File version: %u, Extended version: %u, Extended revision: %u", file->get_version(), file->get_extended_version(), file->get_extended_revision());
 	// makes a copy:
 	settings = env_t::default_settings;
 	settings.rdwr(file);
@@ -9027,18 +9136,7 @@ void karte_t::load(loadsave_t *file)
 	load_version.extended_version = file->get_extended_version();
 	load_version.extended_revision = file->get_extended_revision();
 
-	if(  env_t::networkmode  ) {
-		// clear the checklist history
-		for(  int i=0;  i<LAST_CHECKLISTS_COUNT;  ++i  ) {
-			last_checklists[i] = checklist_t();
-		}
-		for(  int i = 0;  i < CHK_RANDS  ;  i++  ) {
-			rands[i] = 0;
-		}
-		for(  int i = 0;  i < CHK_DEBUG_SUMS  ;  i++  ) {
-			debug_sums[i] = 0;
-		}
-	}
+
 
 
 	if(  env_t::networkmode  ) {
@@ -9164,7 +9262,7 @@ DBG_MESSAGE("karte_t::load()", "init player");
 	}
 	// so far, player 1 will be active (may change in future)
 	active_player = players[0];
-	active_player_nr = 0; 
+	active_player_nr = 0;
 
 	// rdwr cityrules for networkgames
 	if(file->get_version() > 102002 && (file->get_extended_version() == 0 || file->get_extended_version() >= 9)) {
@@ -9266,7 +9364,7 @@ DBG_MESSAGE("karte_t::load()", "init player");
 				sint8 slope;
 				file->rdwr_byte(slope);
 				// convert slopes from old single height saved game
-				slope = (scorner_sw(slope) + scorner_se(slope) * 3 + scorner_ne(slope) * 9 + scorner_nw(slope) * 27) * env_t::pak_height_conversion_factor;
+				slope = encode_corners(scorner_sw(slope), scorner_se(slope), scorner_ne(slope), scorner_nw(slope)) * env_t::pak_height_conversion_factor;
 				access_nocheck(x, y)->get_kartenboden()->set_grund_hang(slope);
 			}
 		}
@@ -9881,6 +9979,52 @@ halthandle_t karte_t::get_halt_koord_index(koord k, player_t *, bool create_halt
 }
 
 
+void karte_t::update_underground()
+{
+	DBG_MESSAGE( "karte_t::update_underground_map()", "" );
+	get_view()->clear_prepared();
+	world_view_t::invalidate_all();
+	set_dirty();
+}
+
+void karte_t::prepare_tiles(rect_t const &new_area, rect_t const &old_area) {
+	if (new_area == old_area) {
+		// area already prepared
+		return;
+	}
+
+	size_t const prepare_rects_capacity = rect_t::MAX_FRAGMENT_DIFFERENCE_COUNT;
+	rect_t prepare_rects[prepare_rects_capacity];
+	size_t const prepare_rects_length = new_area.fragment_difference(old_area, prepare_rects, prepare_rects_capacity);
+
+	// additional tiles to prepare for correct hiding behaviour
+	sint16 const prefix_tiles_x = min(grund_t::MAXIMUM_HIDE_TEST_DISTANCE, new_area.origin.x);
+	sint16 const prefix_tiles_y = min(grund_t::MAXIMUM_HIDE_TEST_DISTANCE, new_area.origin.y);
+
+	for (size_t rect_index = 0 ; rect_index < prepare_rects_length ; rect_index++) {
+		rect_t const &prepare_rect = prepare_rects[rect_index];
+
+		sint16 x_start = prepare_rect.origin.x;
+		sint16 const x_end = x_start + prepare_rect.size.x;
+		if (x_start == new_area.origin.x) {
+			x_start-= prefix_tiles_x;
+		}
+
+		sint16 y_start = prepare_rect.origin.y;
+		sint16 const y_end = y_start + prepare_rect.size.y;
+		if (y_start == new_area.origin.y) {
+			y_start-= prefix_tiles_y;
+		}
+
+		for (sint16 y = y_start ; y < y_end ; y++) {
+			for (sint16 x = x_start ; x < x_end ; x++) {
+				const planquadrat_t &tile = plan[y * cached_grid_size.x + x];
+				tile.update_underground();
+			}
+		}
+	}
+}
+
 void karte_t::calc_climate(koord k, bool recalc)
 {
 	planquadrat_t *pl = access(k);
@@ -9927,8 +10071,8 @@ void karte_t::get_neighbour_heights(const koord k, sint8 neighbour_height[8][4])
 			grund_t *gr2 = pl2->get_kartenboden();
 			slope_t::type slope_corner = gr2->get_grund_hang();
 			for(  int j = 0;  j < 4;  j++  ) {
-				neighbour_height[i][j] = gr2->get_hoehe() + slope_corner % 3;
-				slope_corner /= 3;
+				neighbour_height[i][j] = gr2->get_hoehe() + corner_sw(slope_corner);
+				slope_corner /= slope_t::southeast;
 			}
 		}
 		else {
@@ -10049,7 +10193,7 @@ void karte_t::recalc_transitions(koord k)
 			// corner_se (i=1): tests vs neighbour 3:s (corner 3 j=2),4:se (corner 4) and 5:e (corner 1)
 			// corner_ne (i=2): tests vs neighbour 5:e (corner 4 j=3),6:ne (corner 1) and 7:n (corner 2)
 			// corner_nw (i=3): tests vs neighbour 7:n (corner 1 j=0),0:nw (corner 2) and 1:w (corner 3)
-			sint8 corner_height = gr->get_hoehe() + slope_corner % 3;
+			sint8 corner_height = gr->get_hoehe() + corner_sw(slope_corner);
 
 			climate transition_climate = water_climate;
 			climate min_climate = arctic_climate;
@@ -10065,7 +10209,7 @@ void karte_t::recalc_transitions(koord k)
 			if(  min_climate == water_climate  ||  transition_climate > climate0  ) {
 				climate_corners |= 1 << i;
 			}
-			slope_corner /= 3;
+			slope_corner /= slope_t::southeast;
 		}
 		pl->set_climate_transition_flag( climate_corners != 0 );
 		pl->set_climate_corners( climate_corners );
@@ -10525,6 +10669,15 @@ void karte_t::process_network_commands(sint32 *ms_difference)
 		return;
 	}
 
+	// Knightly : send changed limits to server where necessary
+	if (path_explorer_t::are_local_limits_changed()) {
+		path_explorer_t::limit_set_t local_limits = path_explorer_t::get_local_limits();
+		network_send_server(new nwc_routesearch_t(sync_steps, map_counter, local_limits, false));
+		path_explorer_t::reset_local_limits_state();
+		dbg->warning("karte_t::interactive", "nwc_routesearch_t object created and sent to server: sync_step=%u map_counter=%u limits=(%u, %u, %u, %llu, %u)",
+			sync_steps, map_counter, local_limits.rebuild_connexions, local_limits.filter_eligible, local_limits.fill_matrix, local_limits.explore_paths, local_limits.reroute_goods);
+	}
+
 	// process the received command
 	while(  nwc  ) {
 		// check timing
@@ -10586,14 +10739,14 @@ void karte_t::process_network_commands(sint32 *ms_difference)
 				// out of sync => drop client (but we can only compare if nwt->last_sync_step is not too old)
 				else if(  is_checklist_available(nwt->last_sync_step)  &&  LCHKLST(nwt->last_sync_step)!=nwt->last_checklist  ) {
 					// lost synchronisation -> server kicks client out actively
-					char buf[1024];
+					char buf[2048];
 					const int offset = LCHKLST(nwt->last_sync_step).print(buf, "server");
 					nwt->last_checklist.print(buf + offset, "initiator");
 					dbg->warning("karte_t::process_network_commands", "kicking client due to checklist mismatch : sync_step=%u %s", nwt->last_sync_step, buf);
 					socket_list_t::remove_client( nwc->get_sender() );
 					delete nwc;
 					nwc = NULL;
-				} 
+				}
 			}
 		}
 
@@ -10608,6 +10761,12 @@ void karte_t::process_network_commands(sint32 *ms_difference)
 		nwc = network_get_received_command();
 	}
 	uint32 next_command_step = get_next_command_step();
+
+	// Knightly : check if changed limits, if any, have to be transmitted to all clients
+	if (env_t::server)
+	{
+		nwc_routesearch_t::check_for_transmission(this);
+	}
 
 	// send data
 	ms = dr_time();
@@ -10645,14 +10804,20 @@ void karte_t::do_network_world_command(network_world_command_t *nwc)
 		const uint32 server_sync_step = nwcheck->server_sync_step;
 		const checklist_t client_checklist = LCHKLST(server_sync_step);
 		char buf[2048];
+
 		const int offset = server_checklist.print(buf, "server");
 		assert(offset < 2048);
+
 		const int offset2 = offset + client_checklist.print(buf + offset, "client");
 		assert(offset2 < 2048);
-		dbg->warning("karte_t:::do_network_world_command", "sync_step=%u  %s", server_sync_step, buf);
-		if(client_checklist != server_checklist) {
-			dbg->warning("karte_t:::do_network_world_command", "disconnecting due to checklist mismatch" );
+		(void)offset2;
+
+		if(client_checklist != server_checklist)
+		{
+			dbg->warning("karte_t:::do_network_world_command", "disconnecting due to checklist mismatch:\n%s", buf );
 			network_disconnect();
+		} else {
+			dbg->message("karte_t:::do_network_world_command", "sync_step=%u  %s", server_sync_step, buf);
 		}
 	}
 	else {
@@ -10665,6 +10830,8 @@ void karte_t::do_network_world_command(network_world_command_t *nwc)
 				assert(offset < 2048);
 				const int offset2 = offset + LCHKLST(nwt->last_sync_step).print(buf + offset, "executor");
 				assert(offset2 < 2048);
+				(void)offset2;
+
 				dbg->warning("karte_t:::do_network_world_command", "skipping command due to checklist mismatch : sync_step=%u %s", nwt->last_sync_step, buf);
 				if(  !env_t::server  ) {
 					network_disconnect();
@@ -10728,10 +10895,7 @@ bool karte_t::interactive(uint32 quit_month)
 	}
 	// only needed for network
 	if(  env_t::networkmode  ) {
-		// clear the checklist history
-		for(  int i=0;  i<LAST_CHECKLISTS_COUNT;  ++i  ) {
-			last_checklists[i] = checklist_t();
-		}
+		clear_checklist_history();
 	}
 	sint32 ms_difference = 0;
 	reset_timer();
@@ -10799,12 +10963,15 @@ bool karte_t::interactive(uint32 quit_month)
 
 		// time for the next step?
 		uint32 time = dr_time(); // - (env_t::server ? 0 : 5000);
-		if(  next_step_time<=time  ) {
-			if (step_mode&PAUSE_FLAG ||
-				(env_t::networkmode && !env_t::server  &&  sync_steps >= sync_steps_barrier)) {
+		if ((sint32)next_step_time - (sint32)time <= 0) {
+			if (step_mode&PAUSE_FLAG) {
 				// only update display
 				sync_step( 0, false, true );
 				idle_time = 100;
+			}
+			else if (env_t::networkmode && !env_t::server && sync_steps >= sync_steps_barrier) {
+				sync_step(0, false, true);
+				next_step_time = time + fix_ratio_frame_time;
 			}
 			else {
 				if(  step_mode==FAST_FORWARD  ) {
@@ -11026,7 +11193,6 @@ void karte_t::network_disconnect()
 	// force disconnect
 	dbg->warning("karte_t::network_disconnect()", "Lost synchronisation with server. Random flags: %d", get_random_mode());
 	network_core_shutdown();
-	destroy_all_win(true);
 
 	clear_random_mode( INTERACTIVE_RANDOM );
 	step_mode = NORMAL;
@@ -11035,8 +11201,7 @@ void karte_t::network_disconnect()
 	create_win( display_get_width()/2-128, 40, new news_img("Lost synchronisation\nwith server."), w_info, magic_none);
 	ticker::add_msg( translator::translate("Lost synchronisation\nwith server."), koord::invalid, COL_BLACK );
 	last_active_player_nr = active_player_nr;
-
-	stop(false);
+	set_pause(true);
 }
 
 void karte_t::set_citycar_speed_average()
@@ -11802,7 +11967,7 @@ bool karte_t::check_neighbouring_objects(koord pos)
 
 uint8 karte_t::get_region(koord k, settings_t const* const sets)
 {
-	// Unfortunately, there is no easy to re-use the code from the non-static version here because 
+	// Unfortunately, there is no easy to re-use the code from the non-static version here because
 	// the non-static version must be const, whereas a static member function cannot be.
 	uint8 region_number = 0;
 
@@ -11854,6 +12019,6 @@ std::string karte_t::get_region_name(koord k) const
 	{
 		return std::string("");
 	}
-	
+
 	return settings.regions[region_number].name;
 }
