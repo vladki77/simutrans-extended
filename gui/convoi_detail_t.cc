@@ -591,7 +591,7 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 			}
 
 			// Friction
-			if (v->get_frictionfactor() != 0)
+			if (v->get_frictionfactor() > 1)
 			{
 				buf.clear();
 				buf.printf("%s %i", translator::translate("Friction:"), v->get_frictionfactor());
