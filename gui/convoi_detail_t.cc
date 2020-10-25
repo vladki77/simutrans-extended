@@ -18,6 +18,7 @@
 #include "../dataobj/schedule.h"
 #include "../dataobj/translator.h"
 #include "../dataobj/loadsave.h"
+#include "../dataobj/environment.h"
 // @author hsiegeln
 #include "../simline.h"
 #include "messagebox.h"
@@ -337,7 +338,7 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 		}
 
 		// display total values
-		if (vehicle_count > 0) {
+		if (vehicle_count > 1 || env_t::verbose_debug) {
 			// vehicle min max. speed (not consider weight)
 			//const sint32 cur_speed = speed_to_kmh(cnv->get_akt_speed());
 			const sint32 max_speed = speed_to_kmh(cnv->get_min_top_speed());
@@ -383,12 +384,12 @@ void gui_vehicleinfo_t::draw(scr_coord offset)
 
 			// brake distance
 			//const sint32 brake_distance_cur = cnv->calc_min_braking_distance(gross_weight, kmh2ms * cur_speed);
-			const sint32 brake_distance_max = cnv->calc_min_braking_distance(gross_weight, kmh2ms * max_speed);
+			//const sint32 brake_distance_max = cnv->calc_min_braking_distance(gross_weight, kmh2ms * max_speed);
 			//const sint32 brake_distance_allowed = cnv->calc_min_braking_distance(gross_weight, kmh2ms * allowed_speed);
-			buf.clear();
-			buf.printf(translator::translate("brakes from max. speed in %i m"), brake_distance_max);
-			display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
-			total_height += LINESPACE;
+			//buf.clear();
+			//buf.printf(translator::translate("brakes from max. speed in %i m"), brake_distance_max);
+			//display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
+			//total_height += LINESPACE;
 			//buf.clear();
 			//buf.printf(translator::translate("brakes from %i km/h in %i m"), allowed_speed, brake_distance_allowed);
 			//display_proportional_clip(pos.x + offset.x + D_MARGIN_LEFT, pos.y + offset.y + total_height, buf, ALIGN_LEFT, SYSCOL_TEXT, true);
